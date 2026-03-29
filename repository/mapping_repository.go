@@ -20,32 +20,13 @@ func NewMappingRepository(db *pgxpool.Pool) *MappingRepository {
 	return &MappingRepository{db: db}
 }
 
-// BulkInsert inserts a batch of ID map entries in a single COPY call.
-// Uses ON CONFLICT DO NOTHING so re-runs are safe (idempotent).
-// Intended to be called within the same transaction as the data batch upsert.
+// BulkInsert inserts a batch of ID map entries using SendBatch + ON CONFLICT DO NOTHING.
+// Safe to re-run (idempotent). Intended to be called within the same transaction as the data batch upsert.
 func (r *MappingRepository) BulkInsert(ctx context.Context, tx pgx.Tx, entries []model.IDMapEntry) error {
 	if len(entries) == 0 {
 		return nil
 	}
-
-	rows := make([][]any, len(entries))
-	for i, e := range entries {
-		rows[i] = []any{e.SourceID, e.TargetUUID, e.SourceTable, e.JobID}
-	}
-
-	// Use COPY for bulk insert performance, then deduplicate via ON CONFLICT.
-	// Note: pgx CopyFrom does not support ON CONFLICT, so we use a temp table staging approach.
-	_, err := tx.CopyFrom(
-		ctx,
-		pgx.Identifier{"migration", "_tmp_id_map"},
-		[]string{"source_id", "target_uuid", "source_table", "job_id"},
-		pgx.CopyFromRows(rows),
-	)
-	if err != nil {
-		// Fallback: temp table may not exist yet on first call — use direct INSERT
-		return r.bulkInsertDirect(ctx, tx, entries)
-	}
-	return nil
+	return r.bulkInsertDirect(ctx, tx, entries)
 }
 
 // bulkInsertDirect uses a single INSERT...ON CONFLICT DO NOTHING for the mapping batch.
