@@ -493,10 +493,6 @@ const docTemplate = `{
                     "type": "string",
                     "example": "pasien"
                 },
-                "start_from_id": {
-                    "type": "integer",
-                    "example": 0
-                },
                 "target_table": {
                     "type": "string",
                     "example": "pasien"

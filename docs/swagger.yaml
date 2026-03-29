@@ -24,9 +24,6 @@ definitions:
       source_table:
         example: pasien
         type: string
-      start_from_id:
-        example: 0
-        type: integer
       target_table:
         example: pasien
         type: string
