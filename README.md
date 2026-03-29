@@ -7,7 +7,7 @@ REST API service for migrating patient records from an EMR PostgreSQL database t
 - **ETL pipeline** — server-side cursor with `REPEATABLE READ`, batch transform, `COPY` + temp table + upsert
 - **Schema transformation** — INT primary key → UUID v5 (deterministic), field renames, name merges
 - **Resumable jobs** — checkpoint-based: pause, resume, or rollback any migration job
-- **REST API** — 10 endpoints for full job lifecycle management
+- **REST API** — 11 endpoints for full job lifecycle management
 - **Swagger UI** — interactive API docs at `/swagger/index.html`
 - **Structured logging** — zerolog JSON output with configurable level
 - **12-factor config** — all settings via environment variables, no hardcoded values
@@ -23,7 +23,7 @@ main.go                 ← thin orchestrator (signal handling, wiring)
 ├── database/           ← open/close source (pgx) + target (pgxpool) connections
 ├── server/             ← HTTP server lifecycle + graceful shutdown
 ├── api/
-│   ├── handler.go      ← 10 HTTP handlers
+│   ├── handler.go      ← 11 HTTP handlers
 │   └── router.go       ← Go 1.22 stdlib routing + /swagger/*
 ├── migration/
 │   ├── migrator.go     ← ETL loop + rollback
@@ -33,8 +33,7 @@ main.go                 ← thin orchestrator (signal handling, wiring)
 │   ├── registry.go     ← supported source→target table registry
 │   └── validator.go    ← post-migration row count check
 ├── repository/
-│   ├── job_repo.go     ← migration_jobs CRUD
-│   └── mapping_repo.go ← emr_simrs_id_map CRUD
+│   └── job_repository.go ← migration_jobs CRUD
 ├── monitoring/         ← in-memory live progress tracker
 ├── model/              ← shared structs (MigrationJob, etc.)
 └── docs/               ← generated Swagger docs (swag init)
@@ -67,7 +66,7 @@ cp .env.example .env
 go run main.go
 ```
 
-The server starts on `http://localhost:8080`.
+The server starts on `http://localhost:8090`.
 
 ### 3. Run with Docker (includes local PostgreSQL)
 
@@ -113,7 +112,7 @@ All variables are **required** unless a default is noted.
 | ---------------- | ------------- | ----------------------------------------------------------- |
 | `BATCH_SIZE`     | `5000`        | Rows fetched per cursor FETCH                               |
 | `BATCH_DELAY_MS` | `0`           | Delay (ms) between batches (backpressure)                   |
-| `HTTP_PORT`      | `8080`        | API server port                                             |
+| `HTTP_PORT`      | `8090`        | API server port                                             |
 | `LOG_LEVEL`      | `info`        | Log level: `debug`, `info`, `warn`, `error`                 |
 | `SWAGGER_HOST`   | _(from swag)_ | Override Swagger UI host at runtime (e.g. `localhost:8090`) |
 | `SWAGGER_SCHEME` | `http`        | Override Swagger UI scheme (`http` or `https`)              |
@@ -123,7 +122,7 @@ All variables are **required** unless a default is noted.
 
 ## API Reference
 
-Swagger UI: **`http://localhost:8080/swagger/index.html`**
+Swagger UI: **`http://localhost:8090/swagger/index.html`**
 
 ### Jobs
 
@@ -155,18 +154,18 @@ Swagger UI: **`http://localhost:8080/swagger/index.html`**
 
 ```bash
 # 1. Create job
-curl -s -X POST http://localhost:8080/api/jobs \
+curl -s -X POST http://localhost:8090/api/jobs \
   -H "Content-Type: application/json" \
   -d '{"source_table":"pasien","target_table":"pasien","batch_size":5000}'
 
 # 2. Start job (replace <job_id> with the UUID from the response)
-curl -s -X POST http://localhost:8080/api/jobs/<job_id>/start
+curl -s -X POST http://localhost:8090/api/jobs/<job_id>/start
 
 # 3. Poll progress
-curl -s http://localhost:8080/api/jobs/<job_id>
+curl -s http://localhost:8090/api/jobs/<job_id>
 
 # 4. Validate after completion
-curl -s http://localhost:8080/api/jobs/<job_id>/validate
+curl -s http://localhost:8090/api/jobs/<job_id>/validate
 ```
 
 ### Example: incremental migration (when EMR grows)
@@ -175,18 +174,18 @@ When new patients are added to EMR after a completed migration, simply create a 
 
 ```bash
 # No parameters needed — system detects where to continue automatically
-curl -s -X POST http://localhost:8080/api/jobs \
+curl -s -X POST http://localhost:8090/api/jobs \
   -H "Content-Type: application/json" \
   -d '{"source_table":"pasien","target_table":"pasien"}'
 
 # Start the incremental job
-curl -s -X POST http://localhost:8080/api/jobs/<job_id>/start
+curl -s -X POST http://localhost:8090/api/jobs/<job_id>/start
 ```
 
 To simulate EMR data growth in dev:
 
 ```bash
-curl -s -X POST http://localhost:8080/api/dev/seed-emr-extra
+curl -s -X POST http://localhost:8090/api/dev/seed-emr-extra
 # Inserts 1.5M patients (IDs 2000001–3500000) into EMR. Idempotent.
 ```
 
