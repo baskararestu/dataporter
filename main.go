@@ -62,7 +62,7 @@ func main() {
 	tracker := monitoring.NewTracker()
 	migrator := migration.NewMigrator(db.Source, db.Target, jobRepo, mappingRepo, tracker)
 
-	handler := api.NewHandler(jobRepo, mappingRepo, migrator, tracker, db.Source, db.Target)
+	handler := api.NewHandler(ctx, jobRepo, mappingRepo, migrator, tracker, db.Source, db.Target)
 	mux := api.NewRouter(handler)
 
 	srv := server.New(cfg.HTTPPort, mux)

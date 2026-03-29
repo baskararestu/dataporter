@@ -85,7 +85,9 @@ func (m *Migrator) Run(ctx context.Context, job *model.MigrationJob) error {
 		// Graceful shutdown: finish current batch then exit.
 		select {
 		case <-ctx.Done():
-			_ = m.jobRepo.UpdateStatus(ctx, job.JobID, model.JobStatusPaused)
+			// ctx is already cancelled — use a fresh context for the DB update.
+			pauseCtx := context.Background()
+			_ = m.jobRepo.UpdateStatus(pauseCtx, job.JobID, model.JobStatusPaused)
 			log.Info().Str("job_id", job.JobID.String()).
 				Int64("last_id", job.LastProcessedID).
 				Msg("migration paused (context cancelled)")
@@ -204,7 +206,9 @@ func (m *Migrator) Rollback(ctx context.Context, jobID uuid.UUID) error {
 
 // failJob sets the job status to 'failed' and returns the original error.
 func (m *Migrator) failJob(ctx context.Context, jobID uuid.UUID, err error) error {
-	_ = m.jobRepo.UpdateStatus(ctx, jobID, model.JobStatusFailed)
+	// Use a detached context so the status update succeeds even if ctx was cancelled.
+	dbCtx := context.Background()
+	_ = m.jobRepo.UpdateStatus(dbCtx, jobID, model.JobStatusFailed)
 	log.Error().Str("job_id", jobID.String()).Err(err).Msg("migration failed")
 	return err
 }

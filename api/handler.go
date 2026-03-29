@@ -19,6 +19,7 @@ import (
 
 // Handler holds all HTTP handler dependencies.
 type Handler struct {
+	appCtx      context.Context
 	jobRepo     *repository.JobRepository
 	mappingRepo *repository.MappingRepository
 	migrator    *migration.Migrator
@@ -29,6 +30,7 @@ type Handler struct {
 
 // NewHandler creates a new API handler.
 func NewHandler(
+	appCtx context.Context,
 	jobRepo *repository.JobRepository,
 	mappingRepo *repository.MappingRepository,
 	migrator *migration.Migrator,
@@ -37,6 +39,7 @@ func NewHandler(
 	targetDB *pgxpool.Pool,
 ) *Handler {
 	return &Handler{
+		appCtx:      appCtx,
 		jobRepo:     jobRepo,
 		mappingRepo: mappingRepo,
 		migrator:    migrator,
@@ -122,7 +125,7 @@ func (h *Handler) StartJob(w http.ResponseWriter, r *http.Request) {
 	log.Info().Str("job_id", jobID.String()).Str("source", job.SourceTable).Str("target", job.TargetTable).
 		Str("current_status", string(job.Status)).Msg("starting migration job")
 	go func() {
-		if err := h.migrator.Run(context.Background(), job); err != nil {
+		if err := h.migrator.Run(h.appCtx, job); err != nil {
 			log.Error().Str("job_id", jobID.String()).Err(err).Msg("migration goroutine error")
 		}
 	}()
