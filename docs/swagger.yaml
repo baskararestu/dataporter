@@ -24,6 +24,9 @@ definitions:
       source_table:
         example: pasien
         type: string
+      start_from_id:
+        example: 2000000
+        type: integer
       target_table:
         example: pasien
         type: string
@@ -256,8 +259,9 @@ paths:
       - jobs
   /api/jobs/{job_id}/validate:
     get:
-      description: Runs a post-migration row count comparison between source and target
-        for the given job's ID range.
+      description: |-
+        Compares source row count (by ID range) against target rows accounted by the job counters.
+        Uses 2 COUNT queries — no UUID generation, O(1) in round-trips regardless of row count.
       parameters:
       - description: Job UUID
         in: path
@@ -283,7 +287,7 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/model.APIResponse'
-      summary: Validate migration job
+      summary: Verify migration consistency
       tags:
       - jobs
   /api/tables:

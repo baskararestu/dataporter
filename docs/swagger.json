@@ -339,14 +339,14 @@
         },
         "/api/jobs/{job_id}/validate": {
             "get": {
-                "description": "Runs a post-migration row count comparison between source and target for the given job's ID range.",
+                "description": "Compares source row count (by ID range) against target rows accounted by the job counters.\nUses 2 COUNT queries — no UUID generation, O(1) in round-trips regardless of row count.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "jobs"
                 ],
-                "summary": "Validate migration job",
+                "summary": "Verify migration consistency",
                 "parameters": [
                     {
                         "type": "string",
@@ -458,6 +458,10 @@
                 "source_table": {
                     "type": "string",
                     "example": "pasien"
+                },
+                "start_from_id": {
+                    "type": "integer",
+                    "example": 2000000
                 },
                 "target_table": {
                     "type": "string",

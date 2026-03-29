@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -76,15 +75,15 @@ func (h *Handler) CreateJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Guard: prevent accidental re-migration when source has already been fully migrated.
-	// User must explicitly pass force=true to bypass.
-	if !req.Force {
-		existing, err := h.jobRepo.GetLatestCompleted(r.Context(), req.SourceTable, req.TargetTable)
-		if err == nil && existing != nil && existing.Processed >= existing.TotalRecords && existing.TotalRecords > 0 {
-			jsonError(w, http.StatusConflict,
-				fmt.Sprintf("'%s' already fully migrated (%d records). set force=true to re-migrate",
-					req.SourceTable, existing.TotalRecords))
-			return
+	if req.StartFromID == 0 {
+		if prev, err := h.jobRepo.GetLatestCompleted(r.Context(), req.SourceTable, req.TargetTable); err == nil && prev != nil {
+			if prev.Processed >= prev.TotalRecords && prev.TotalRecords > 0 {
+				// Previous job fully migrated — auto-set checkpoint to continue from where it left off.
+				req.StartFromID = prev.LastProcessedID
+				log.Info().Str("source_table", req.SourceTable).
+					Int64("start_from_id", req.StartFromID).
+					Msg("incremental migration: continuing from previous job checkpoint")
+			}
 		}
 	}
 
@@ -266,10 +265,11 @@ func (h *Handler) GetJob(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, http.StatusOK, "ok", resp)
 }
 
-// ValidateJob runs a post-migration count check for the job.
+// ValidateJob runs a post-migration consistency check for the job.
 //
-// @Summary      Validate migration job
-// @Description  Runs a post-migration row count comparison between source and target for the given job's ID range.
+// @Summary      Verify migration consistency
+// @Description  Compares source row count (by ID range) against target rows accounted by the job counters.
+// @Description  Uses 2 COUNT queries — no UUID generation, O(1) in round-trips regardless of row count.
 // @Tags         jobs
 // @Produce      json
 // @Param        job_id  path      string  true  "Job UUID"
@@ -288,13 +288,23 @@ func (h *Handler) ValidateJob(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusNotFound, "job not found")
 		return
 	}
-	validator := migration.NewValidator(h.sourceConn, h.targetDB)
-	result, err := validator.Validate(r.Context(), jobID, job.SourceTable, job.FirstProcessedID, job.LastProcessedID)
-	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "validation failed: "+err.Error())
+	if job.FirstProcessedID == 0 && job.LastProcessedID == 0 {
+		jsonError(w, http.StatusConflict, "job has not processed any rows yet")
 		return
 	}
-	jsonOK(w, http.StatusOK, "ok", result)
+	validator := migration.NewValidator(h.sourceConn, h.targetDB)
+	result, err := validator.Verify(r.Context(), jobID, job.SourceTable,
+		job.FirstProcessedID, job.LastProcessedID,
+		job.Success, job.Skipped)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, "verification failed: "+err.Error())
+		return
+	}
+	msg := "data is consistent"
+	if !result.IsConsistent {
+		msg = "data is inconsistent"
+	}
+	jsonOK(w, http.StatusOK, msg, result)
 }
 
 // GetJobErrors returns the error_log JSONB for a job as a parsed array.

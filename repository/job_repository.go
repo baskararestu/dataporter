@@ -27,8 +27,8 @@ func NewJobRepository(db *pgxpool.Pool) *JobRepository {
 func (r *JobRepository) Create(ctx context.Context, req model.CreateJobRequest) (*model.MigrationJob, error) {
 	const q = `
 		INSERT INTO migration.migration_jobs
-			(source_table, target_table, batch_size, batch_delay_ms, dry_run)
-		VALUES ($1, $2, $3, $4, $5)
+			(source_table, target_table, batch_size, batch_delay_ms, dry_run, last_processed_id)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING job_id, source_table, target_table, status,
 		          total_records, processed, success, failed, skipped,
 		          last_processed_id, first_processed_id,
@@ -37,7 +37,7 @@ func (r *JobRepository) Create(ctx context.Context, req model.CreateJobRequest) 
 
 	row := r.db.QueryRow(ctx, q,
 		req.SourceTable, req.TargetTable,
-		req.BatchSize, req.BatchDelayMs, req.DryRun,
+		req.BatchSize, req.BatchDelayMs, req.DryRun, req.StartFromID,
 	)
 	return scanJob(row)
 }

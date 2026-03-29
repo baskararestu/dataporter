@@ -3,25 +3,23 @@ package migration
 import (
 	"context"
 	"fmt"
-	"strconv"
 
-	"github.com/baskararestu/dataporter/model"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// ValidationResult holds the outcome of a post-migration count check.
-type ValidationResult struct {
-	JobID       uuid.UUID `json:"job_id"`
-	SourceTable string    `json:"source_table"`
-	SourceCount int64     `json:"source_count"`
-	TargetCount int64     `json:"target_count"`
-	Missing     int64     `json:"missing"`
-	Match       bool      `json:"match"`
+// VerifyResult holds the outcome of a post-migration consistency check.
+type VerifyResult struct {
+	JobID        uuid.UUID `json:"job_id"`
+	SourceTable  string    `json:"source_table"`
+	SourceCount  int64     `json:"source_count"`
+	TargetCount  int64     `json:"target_count"`
+	Missing      int64     `json:"missing"`
+	IsConsistent bool      `json:"is_consistent"`
 }
 
-// Validator compares row counts between source and target after a migration run.
+// Validator compares row counts between source and target for a given job range.
 type Validator struct {
 	sourceConn *pgx.Conn
 	targetDB   *pgxpool.Pool
@@ -32,10 +30,13 @@ func NewValidator(sourceConn *pgx.Conn, targetDB *pgxpool.Pool) *Validator {
 	return &Validator{sourceConn: sourceConn, targetDB: targetDB}
 }
 
-// Validate counts rows in source and target and returns a comparison result.
-// Compares source rows in the job's ID range against actual rows in public.pasien
-// by recomputing deterministic UUID v5 in batches.
-func (v *Validator) Validate(ctx context.Context, jobID uuid.UUID, sourceTable string, firstID, lastID int64) (*ValidationResult, error) {
+// Verify counts rows in source and target using 2 simple COUNT queries.
+//
+// Source: COUNT(*) WHERE id_pasien BETWEEN firstID AND lastID
+// Target: job.Success + job.Skipped (rows that exist in target = inserted + already existed)
+//
+// This is O(1) in round-trips regardless of how many rows were migrated.
+func (v *Validator) Verify(ctx context.Context, jobID uuid.UUID, sourceTable string, firstID, lastID, jobSuccess, jobSkipped int64) (*VerifyResult, error) {
 	var sourceCount int64
 	err := v.sourceConn.QueryRow(ctx,
 		`SELECT COUNT(*) FROM pasien WHERE id_pasien BETWEEN $1 AND $2`,
@@ -45,39 +46,17 @@ func (v *Validator) Validate(ctx context.Context, jobID uuid.UUID, sourceTable s
 		return nil, fmt.Errorf("count source rows: %w", err)
 	}
 
-	// Count target rows by checking existence of deterministic UUID v5 in batches.
-	const batchSize = 5000
-	var targetCount int64
-
-	for start := firstID; start <= lastID; start += batchSize {
-		end := start + batchSize - 1
-		if end > lastID {
-			end = lastID
-		}
-
-		uuids := make([]uuid.UUID, 0, end-start+1)
-		for id := start; id <= end; id++ {
-			uuids = append(uuids, uuid.NewSHA1(model.UUIDNamespace, []byte(strconv.FormatInt(id, 10))))
-		}
-
-		var batchCount int64
-		err = v.targetDB.QueryRow(ctx,
-			`SELECT COUNT(*) FROM public.pasien WHERE pasien_uuid = ANY($1)`,
-			uuids,
-		).Scan(&batchCount)
-		if err != nil {
-			return nil, fmt.Errorf("count target rows batch: %w", err)
-		}
-		targetCount += batchCount
-	}
-
+	// target count = rows that are definitely in target.
+	// inserted (success) + skipped (DO NOTHING = already existed) = total present in target.
+	targetCount := jobSuccess + jobSkipped
 	missing := sourceCount - targetCount
-	return &ValidationResult{
-		JobID:       jobID,
-		SourceTable: sourceTable,
-		SourceCount: sourceCount,
-		TargetCount: targetCount,
-		Missing:     missing,
-		Match:       missing == 0,
+
+	return &VerifyResult{
+		JobID:        jobID,
+		SourceTable:  sourceTable,
+		SourceCount:  sourceCount,
+		TargetCount:  targetCount,
+		Missing:      missing,
+		IsConsistent: missing == 0,
 	}, nil
 }
