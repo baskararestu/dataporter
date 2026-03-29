@@ -33,9 +33,10 @@ clean:
 tidy:
 	go mod tidy
 
-# Regenerate Swagger docs (requires: go install github.com/swaggo/swag/cmd/swag@v1.16.4)
+# Regenerate Swagger docs
+SWAG := $(shell which swag 2>/dev/null || echo $(HOME)/go/bin/swag)
 swag:
-	swag init --generalInfo main.go --output docs --parseDependency --parseInternal
+	$(SWAG) init --generalInfo main.go --output docs --parseDependency --parseInternal
 
 # View logs
 logs:
