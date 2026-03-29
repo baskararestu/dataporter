@@ -51,6 +51,8 @@ type CreateJobRequest struct {
 	BatchSize    int    `json:"batch_size"    example:"5000"`
 	BatchDelayMs int    `json:"batch_delay_ms" example:"0"`
 	DryRun       bool   `json:"dry_run"       example:"false"`
+	// Force bypasses the already-migrated guard and allows re-running a completed migration.
+	Force bool `json:"force"         example:"false"`
 }
 
 // APIResponse is the standard response envelope for all API endpoints.

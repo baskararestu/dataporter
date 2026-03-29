@@ -161,6 +161,24 @@ func (r *JobRepository) SetTotalRecords(ctx context.Context, jobID uuid.UUID, to
 	return nil
 }
 
+// GetLatestCompleted returns the most recent completed job for a source+target pair.
+// Used by CreateJob to detect when a migration has already been fully processed.
+func (r *JobRepository) GetLatestCompleted(ctx context.Context, sourceTable, targetTable string) (*model.MigrationJob, error) {
+	const q = `
+		SELECT job_id, source_table, target_table, status,
+		       total_records, processed, success, failed, skipped,
+		       last_processed_id, first_processed_id,
+		       batch_size, batch_delay_ms, dry_run, error_log,
+		       started_at, completed_at, rolled_back_at, created_at, updated_at
+		FROM migration.migration_jobs
+		WHERE source_table = $1 AND target_table = $2 AND status = 'completed'
+		ORDER BY created_at DESC
+		LIMIT 1`
+
+	row := r.db.QueryRow(ctx, q, sourceTable, targetTable)
+	return scanJob(row)
+}
+
 // AppendError adds a structured error entry to the job's error_log JSONB array.
 func (r *JobRepository) AppendError(ctx context.Context, jobID uuid.UUID, entry any) error {
 	b, err := json.Marshal(entry)

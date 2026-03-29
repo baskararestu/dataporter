@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -74,6 +75,19 @@ func (h *Handler) CreateJob(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
+
+	// Guard: prevent accidental re-migration when source has already been fully migrated.
+	// User must explicitly pass force=true to bypass.
+	if !req.Force {
+		existing, err := h.jobRepo.GetLatestCompleted(r.Context(), req.SourceTable, req.TargetTable)
+		if err == nil && existing != nil && existing.Processed >= existing.TotalRecords && existing.TotalRecords > 0 {
+			jsonError(w, http.StatusConflict,
+				fmt.Sprintf("'%s' already fully migrated (%d records). set force=true to re-migrate",
+					req.SourceTable, existing.TotalRecords))
+			return
+		}
+	}
+
 	log.Info().Str("source_table", req.SourceTable).Str("target_table", req.TargetTable).
 		Int("batch_size", req.BatchSize).Bool("dry_run", req.DryRun).Msg("creating migration job")
 	job, err := h.jobRepo.Create(r.Context(), req)

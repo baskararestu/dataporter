@@ -116,10 +116,11 @@ func (m *Migrator) Run(ctx context.Context, job *model.MigrationJob) error {
 			})
 		}
 
-		// Load: COPY + upsert + mapping + checkpoint in one transaction.
+		// Load: COPY + upsert + checkpoint in one transaction.
 		// Pass only the source rows that were successfully transformed.
 		transformedSrc := filterTransformed(srcBatch, transformErrs)
-		if err := m.loader.LoadBatch(ctx, job.JobID, m.jobRepo, dstBatch, transformedSrc, job.DryRun); err != nil {
+		inserted, skipped, err := m.loader.LoadBatch(ctx, job.JobID, m.jobRepo, dstBatch, transformedSrc, job.DryRun)
+		if err != nil {
 			return m.failJob(ctx, job.JobID, fmt.Errorf("load batch %d: %w", batchNum, err))
 		}
 
@@ -130,6 +131,8 @@ func (m *Migrator) Run(ctx context.Context, job *model.MigrationJob) error {
 		log.Info().
 			Str("job_id", job.JobID.String()).
 			Int("batch", batchNum).
+			Int64("inserted", inserted).
+			Int64("skipped", skipped).
 			Int64("processed", processed).
 			Int64("success", success).
 			Int64("failed", failed).
