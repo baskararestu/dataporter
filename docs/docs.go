@@ -20,6 +20,38 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/dev/seed-emr-extra": {
+            "post": {
+                "description": "Inserts 1.5M additional patients into the EMR database to simulate data growth. Disabled in production. Idempotent — safe to call multiple times.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dev"
+                ],
+                "summary": "Seed extra EMR data (dev only)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/model.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/model.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/jobs": {
             "get": {
                 "description": "Returns all migration jobs. Optionally filter by status query parameter.",
@@ -463,7 +495,7 @@ const docTemplate = `{
                 },
                 "start_from_id": {
                     "type": "integer",
-                    "example": 2000000
+                    "example": 0
                 },
                 "target_table": {
                     "type": "string",
