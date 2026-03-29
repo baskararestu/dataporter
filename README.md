@@ -109,15 +109,15 @@ All variables are **required** unless a default is noted.
 
 ### Application
 
-| Variable         | Default         | Description                                              |
-| ---------------- | --------------- | -------------------------------------------------------- |
-| `BATCH_SIZE`     | `5000`          | Rows fetched per cursor FETCH                            |
-| `BATCH_DELAY_MS` | `0`             | Delay (ms) between batches (backpressure)                |
-| `HTTP_PORT`      | `8080`          | API server port                                          |
-| `LOG_LEVEL`      | `info`          | Log level: `debug`, `info`, `warn`, `error`              |
-| `SWAGGER_HOST`   | *(from swag)*   | Override Swagger UI host at runtime (e.g. `localhost:8090`) |
-| `SWAGGER_SCHEME` | `http`          | Override Swagger UI scheme (`http` or `https`)           |
-| `APP_ENV`        | `development`   | Set to `production` to disable dev-only endpoints        |
+| Variable         | Default       | Description                                                 |
+| ---------------- | ------------- | ----------------------------------------------------------- |
+| `BATCH_SIZE`     | `5000`        | Rows fetched per cursor FETCH                               |
+| `BATCH_DELAY_MS` | `0`           | Delay (ms) between batches (backpressure)                   |
+| `HTTP_PORT`      | `8080`        | API server port                                             |
+| `LOG_LEVEL`      | `info`        | Log level: `debug`, `info`, `warn`, `error`                 |
+| `SWAGGER_HOST`   | _(from swag)_ | Override Swagger UI host at runtime (e.g. `localhost:8090`) |
+| `SWAGGER_SCHEME` | `http`        | Override Swagger UI scheme (`http` or `https`)              |
+| `APP_ENV`        | `development` | Set to `production` to disable dev-only endpoints           |
 
 ---
 
@@ -147,9 +147,9 @@ Swagger UI: **`http://localhost:8080/swagger/index.html`**
 
 ### Dev
 
-| Method  | Endpoint                    | Description                                                      |
-| ------- | --------------------------- | ---------------------------------------------------------------- |
-| `POST`  | `/api/dev/seed-emr-extra`   | Insert 1.5M extra patients into EMR (dev only, disabled in prod) |
+| Method | Endpoint                  | Description                                                      |
+| ------ | ------------------------- | ---------------------------------------------------------------- |
+| `POST` | `/api/dev/seed-emr-extra` | Insert 1.5M extra patients into EMR (dev only, disabled in prod) |
 
 ### Example: run a full migration
 
@@ -194,22 +194,22 @@ curl -s -X POST http://localhost:8080/api/dev/seed-emr-extra
 
 ## Schema Transformation (EMR → SIMRS)
 
-| EMR field                          | SIMRS field               | Transformation                              |
-| ---------------------------------- | ------------------------- | ------------------------------------------- |
-| `id_pasien` (INT)                  | `pasien_uuid` (UUID)      | UUID v5 deterministic: `SHA1(ns, id_pasien)` |
-| `nama_depan` + `nama_belakang`     | `nama_lengkap`            | Concatenated, truncated to 100 chars        |
-| `tanggal_lahir`                    | `tanggal_lahir`           | Direct copy                                 |
-| `jenis_kelamin`                    | `gender`                  | Direct copy                                 |
-| `email`                            | `email`                   | Truncated to 100 chars                      |
-| `no_telepon`                       | `telepon`                 | Direct copy                                 |
-| `alamat`                           | `alamat_lengkap`          | Direct copy                                 |
-| `kota`                             | `kota`                    | Direct copy                                 |
-| `provinsi`                         | `provinsi`                | Direct copy                                 |
-| `kode_pos`                         | `kode_pos`                | Direct copy                                 |
-| `golongan_darah`                   | `golongan_darah`          | Direct copy                                 |
-| `kontak_darurat`                   | `nama_kontak_darurat`     | Direct copy                                 |
-| `no_kontak_darurat`                | `telepon_kontak_darurat`  | Direct copy                                 |
-| `tanggal_registrasi`               | `tanggal_registrasi`      | Direct copy                                 |
+| EMR field                      | SIMRS field              | Transformation                               |
+| ------------------------------ | ------------------------ | -------------------------------------------- |
+| `id_pasien` (INT)              | `pasien_uuid` (UUID)     | UUID v5 deterministic: `SHA1(ns, id_pasien)` |
+| `nama_depan` + `nama_belakang` | `nama_lengkap`           | Concatenated, truncated to 100 chars         |
+| `tanggal_lahir`                | `tanggal_lahir`          | Direct copy                                  |
+| `jenis_kelamin`                | `gender`                 | Direct copy                                  |
+| `email`                        | `email`                  | Truncated to 100 chars                       |
+| `no_telepon`                   | `telepon`                | Direct copy                                  |
+| `alamat`                       | `alamat_lengkap`         | Direct copy                                  |
+| `kota`                         | `kota`                   | Direct copy                                  |
+| `provinsi`                     | `provinsi`               | Direct copy                                  |
+| `kode_pos`                     | `kode_pos`               | Direct copy                                  |
+| `golongan_darah`               | `golongan_darah`         | Direct copy                                  |
+| `kontak_darurat`               | `nama_kontak_darurat`    | Direct copy                                  |
+| `no_kontak_darurat`            | `telepon_kontak_darurat` | Direct copy                                  |
+| `tanggal_registrasi`           | `tanggal_registrasi`     | Direct copy                                  |
 
 ---
 
