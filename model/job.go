@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -33,8 +34,8 @@ type MigrationJob struct {
 	FirstProcessedID int64      `db:"first_processed_id" json:"first_processed_id"`
 	BatchSize        int        `db:"batch_size"        json:"batch_size"`
 	BatchDelayMs     int        `db:"batch_delay_ms"    json:"batch_delay_ms"`
-	DryRun           bool       `db:"dry_run"           json:"dry_run"`
-	ErrorLog         []byte     `db:"error_log"         json:"error_log,omitempty"` // JSONB stored as raw bytes
+	DryRun           bool             `db:"dry_run"           json:"dry_run"`
+	ErrorLog         json.RawMessage  `db:"error_log"         json:"error_log,omitempty"` // JSONB stored as raw bytes
 	StartedAt        *time.Time `db:"started_at"        json:"started_at,omitempty"`
 	CompletedAt      *time.Time `db:"completed_at"      json:"completed_at,omitempty"`
 	RolledBackAt     *time.Time `db:"rolled_back_at"    json:"rolled_back_at,omitempty"`

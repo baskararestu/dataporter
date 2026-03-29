@@ -74,6 +74,8 @@ func (h *Handler) CreateJob(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusUnprocessableEntity, "unsupported_table", err.Error())
 		return
 	}
+	log.Info().Str("source_table", req.SourceTable).Str("target_table", req.TargetTable).
+		Int("batch_size", req.BatchSize).Bool("dry_run", req.DryRun).Msg("creating migration job")
 	job, err := h.jobRepo.Create(r.Context(), req)
 	if err != nil {
 		if strings.Contains(err.Error(), "23505") {
@@ -83,6 +85,7 @@ func (h *Handler) CreateJob(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusInternalServerError, "create_failed", err.Error())
 		return
 	}
+	log.Info().Str("job_id", job.JobID.String()).Msg("migration job created")
 	jsonOK(w, http.StatusCreated, job)
 }
 
@@ -116,6 +119,8 @@ func (h *Handler) StartJob(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusConflict, "terminal_state", "job is in a terminal state and cannot be restarted")
 		return
 	}
+	log.Info().Str("job_id", jobID.String()).Str("source", job.SourceTable).Str("target", job.TargetTable).
+		Str("current_status", string(job.Status)).Msg("starting migration job")
 	go func() {
 		if err := h.migrator.Run(context.Background(), job); err != nil {
 			log.Error().Str("job_id", jobID.String()).Err(err).Msg("migration goroutine error")

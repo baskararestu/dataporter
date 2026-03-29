@@ -6,8 +6,8 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger"
 )
 
-// NewRouter wires all HTTP routes to their handlers.
-func NewRouter(h *Handler) *http.ServeMux {
+// NewRouter wires all HTTP routes to their handlers and wraps with logging middleware.
+func NewRouter(h *Handler) http.Handler {
 	mux := http.NewServeMux()
 
 	// Swagger UI — accessible at /swagger/index.html
@@ -29,5 +29,5 @@ func NewRouter(h *Handler) *http.ServeMux {
 	mux.HandleFunc("GET /api/tables", h.ListTables)
 	mux.HandleFunc("GET /healthz", h.Healthz)
 
-	return mux
+	return LoggingMiddleware(mux)
 }
