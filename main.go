@@ -17,6 +17,7 @@ import (
 	"github.com/baskararestu/dataporter/repository"
 	"github.com/baskararestu/dataporter/server"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
 	"github.com/rs/zerolog/log"
 )
 
@@ -24,6 +25,9 @@ import (
 var schemaDDL string
 
 func main() {
+	// Load .env if present (local dev). In production, env vars are injected directly.
+	_ = godotenv.Load()
+
 	cfg, err := config.Load()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "config error: %v\n", err)
