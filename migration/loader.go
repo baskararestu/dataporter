@@ -53,7 +53,7 @@ func (l *Loader) LoadBatch(
 		// Step 1: temp table — same structure as target, no constraints, auto-dropped at commit.
 		if _, err := tx.Exec(ctx, `
 			CREATE TEMP TABLE IF NOT EXISTS _tmp_pasien
-			(LIKE pasien INCLUDING NOTHING) ON COMMIT DROP`); err != nil {
+			(LIKE pasien) ON COMMIT DROP`); err != nil {
 			return fmt.Errorf("create temp table: %w", err)
 		}
 
