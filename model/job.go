@@ -51,7 +51,7 @@ type CreateJobRequest struct {
 	BatchSize    int    `json:"batch_size"    example:"5000"`
 	BatchDelayMs int    `json:"batch_delay_ms" example:"0"`
 	DryRun       bool   `json:"dry_run"       example:"false"`
-	StartFromID int64 `json:"start_from_id" example:"0"`
+	StartFromID  int64  `json:"start_from_id" example:"0"`
 }
 
 // APIResponse is the standard response envelope for all API endpoints.

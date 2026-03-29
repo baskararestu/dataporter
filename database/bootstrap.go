@@ -151,6 +151,47 @@ func initEMR(ctx context.Context, dbCfg config.DBConfig, emrDDL string) error {
 	return nil
 }
 
+// SeedEMRExtra inserts 1.5M additional patients (IDs 2000001–3500000) into the EMR
+// database using the provided SQL script. Idempotent — uses ON CONFLICT DO NOTHING.
+//
+// Returns the row counts before and after the operation so callers can report
+// how many rows were actually added.
+//
+// Intended for dev/staging use only to simulate EMR data growth.
+func SeedEMRExtra(ctx context.Context, dbCfg config.DBConfig, extraSQL string) (beforeCount, afterCount int64, err error) {
+	conn, err := pgx.Connect(ctx, dbCfg.DSN())
+	if err != nil {
+		return 0, 0, fmt.Errorf("connect EMR %s: %w", dbCfg.Name, err)
+	}
+	defer conn.Close(ctx)
+
+	if err := conn.QueryRow(ctx, `SELECT COUNT(id_pasien) FROM pasien`).Scan(&beforeCount); err != nil {
+		return 0, 0, fmt.Errorf("count pasien before seed: %w", err)
+	}
+
+	log.Info().
+		Str("database", dbCfg.Name).
+		Int64("before_count", beforeCount).
+		Msg("seeding extra 1.5M EMR rows...")
+
+	if _, err := conn.Exec(ctx, extraSQL); err != nil {
+		return beforeCount, 0, fmt.Errorf("exec extra seed SQL: %w", err)
+	}
+
+	if err := conn.QueryRow(ctx, `SELECT COUNT(id_pasien) FROM pasien`).Scan(&afterCount); err != nil {
+		return beforeCount, 0, fmt.Errorf("count pasien after seed: %w", err)
+	}
+
+	log.Info().
+		Str("database", dbCfg.Name).
+		Int64("before_count", beforeCount).
+		Int64("after_count", afterCount).
+		Int64("added", afterCount-beforeCount).
+		Msg("extra EMR seed complete")
+
+	return beforeCount, afterCount, nil
+}
+
 // sanitizeIdentifier wraps a database name in double quotes for safe SQL injection
 // prevention in DDL statements (CREATE DATABASE, etc.).
 func sanitizeIdentifier(name string) string {

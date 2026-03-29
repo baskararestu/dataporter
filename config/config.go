@@ -51,6 +51,11 @@ type Config struct {
 
 	// SwaggerScheme overrides the Swagger UI scheme at runtime ("http" or "https").
 	SwaggerScheme string `env:"SWAGGER_SCHEME" envDefault:"http"`
+
+	// AppEnv is the deployment environment ("development", "staging", "production").
+	// Dev-only endpoints (e.g. POST /api/dev/seed-emr-extra) are disabled when
+	// AppEnv == "production".
+	AppEnv string `env:"APP_ENV" envDefault:"development"`
 }
 
 // Load reads configuration from environment variables.

@@ -29,5 +29,8 @@ func NewRouter(h *Handler) http.Handler {
 	mux.HandleFunc("GET /api/tables", h.ListTables)
 	mux.HandleFunc("GET /healthz", h.Healthz)
 
+	// Dev-only endpoints (disabled in production via APP_ENV guard inside handler)
+	mux.HandleFunc("POST /api/dev/seed-emr-extra", h.DevSeedEMRExtra)
+
 	return LoggingMiddleware(mux)
 }

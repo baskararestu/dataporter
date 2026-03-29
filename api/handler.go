@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/baskararestu/dataporter/config"
+	"github.com/baskararestu/dataporter/database"
 	"github.com/baskararestu/dataporter/migration"
 	"github.com/baskararestu/dataporter/model"
 	"github.com/baskararestu/dataporter/monitoring"
@@ -19,12 +21,15 @@ import (
 
 // Handler holds all HTTP handler dependencies.
 type Handler struct {
-	appCtx     context.Context
-	jobRepo    *repository.JobRepository
-	migrator   *migration.Migrator
-	tracker    *monitoring.Tracker
-	sourceConn *pgx.Conn
-	targetDB   *pgxpool.Pool
+	appCtx      context.Context
+	jobRepo     *repository.JobRepository
+	migrator    *migration.Migrator
+	tracker     *monitoring.Tracker
+	sourceConn  *pgx.Conn
+	targetDB    *pgxpool.Pool
+	sourceDBCfg config.DBConfig
+	emrExtraSQL string
+	appEnv      string
 }
 
 // NewHandler creates a new API handler.
@@ -35,14 +40,20 @@ func NewHandler(
 	tracker *monitoring.Tracker,
 	sourceConn *pgx.Conn,
 	targetDB *pgxpool.Pool,
+	sourceDBCfg config.DBConfig,
+	emrExtraSQL string,
+	appEnv string,
 ) *Handler {
 	return &Handler{
-		appCtx:     appCtx,
-		jobRepo:    jobRepo,
-		migrator:   migrator,
-		tracker:    tracker,
-		sourceConn: sourceConn,
-		targetDB:   targetDB,
+		appCtx:      appCtx,
+		jobRepo:     jobRepo,
+		migrator:    migrator,
+		tracker:     tracker,
+		sourceConn:  sourceConn,
+		targetDB:    targetDB,
+		sourceDBCfg: sourceDBCfg,
+		emrExtraSQL: emrExtraSQL,
+		appEnv:      appEnv,
 	}
 }
 
@@ -382,4 +393,38 @@ func jsonError(w http.ResponseWriter, status int, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(model.APIResponse{Success: false, Message: message, Data: nil})
+}
+
+// DevSeedEMRExtra inserts 1.5M additional patients (IDs 2000001–3500000) into EMR.
+// This endpoint is DISABLED in production (APP_ENV=production).
+//
+// @Summary      Seed extra EMR data (dev only)
+// @Description  Inserts 1.5M additional patients into the EMR database to simulate data growth. Disabled in production. Idempotent — safe to call multiple times.
+// @Tags         dev
+// @Produce      json
+// @Success      200  {object}  model.APIResponse
+// @Failure      403  {object}  model.APIResponse
+// @Failure      500  {object}  model.APIResponse
+// @Router       /api/dev/seed-emr-extra [post]
+func (h *Handler) DevSeedEMRExtra(w http.ResponseWriter, r *http.Request) {
+	if strings.ToLower(h.appEnv) == "production" {
+		jsonError(w, http.StatusForbidden, "this endpoint is disabled in production")
+		return
+	}
+
+	log.Info().Str("app_env", h.appEnv).Msg("dev seed: starting extra EMR seed (1.5M rows)")
+
+	before, after, err := database.SeedEMRExtra(r.Context(), h.sourceDBCfg, h.emrExtraSQL)
+	if err != nil {
+		log.Error().Err(err).Msg("dev seed: extra EMR seed failed")
+		jsonError(w, http.StatusInternalServerError, "seed failed: "+err.Error())
+		return
+	}
+
+	added := after - before
+	jsonOK(w, http.StatusOK, "extra EMR seed complete", map[string]any{
+		"before_count": before,
+		"after_count":  after,
+		"added":        added,
+	})
 }

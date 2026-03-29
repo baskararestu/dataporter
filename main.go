@@ -27,6 +27,9 @@ var emrDDL string
 //go:embed scripts/002_init_simrs.sql
 var simrsDDL string
 
+//go:embed scripts/003_seed_emr_extra.sql
+var emrExtraSQL string
+
 // @title           DataPorter API
 // @version         1.0
 // @description     REST API for migrating patient records from EMR PostgreSQL to SIMRS with schema transformation.
@@ -73,7 +76,7 @@ func main() {
 	tracker := monitoring.NewTracker()
 	migrator := migration.NewMigrator(db.Source, db.Target, jobRepo, tracker)
 
-	handler := api.NewHandler(ctx, jobRepo, migrator, tracker, db.Source, db.Target)
+	handler := api.NewHandler(ctx, jobRepo, migrator, tracker, db.Source, db.Target, cfg.Source, emrExtraSQL, cfg.AppEnv)
 	mux := api.NewRouter(handler)
 
 	srv := server.New(cfg.HTTPPort, mux)
