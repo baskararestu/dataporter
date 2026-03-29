@@ -475,7 +475,7 @@ var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
 	Host:             "dtp-api.baskararw.my.id",
 	BasePath:         "/",
-	Schemes:          []string{"https"},
+	Schemes:          []string{"https", "http"},
 	Title:            "DataPorter API",
 	Description:      "REST API for migrating patient records from EMR PostgreSQL to SIMRS with schema transformation.",
 	InfoInstanceName: "swagger",

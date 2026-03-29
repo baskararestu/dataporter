@@ -43,6 +43,14 @@ type Config struct {
 
 	// LogLevel controls zerolog output level (debug, info, warn, error).
 	LogLevel string `env:"LOG_LEVEL" envDefault:"info"`
+
+	// SwaggerHost overrides the Swagger UI host at runtime.
+	// Local dev: "localhost:8090", Production: "dtp-api.baskararw.my.id"
+	// If empty, the value baked into docs/ at swag-init time is used.
+	SwaggerHost string `env:"SWAGGER_HOST"`
+
+	// SwaggerScheme overrides the Swagger UI scheme at runtime ("http" or "https").
+	SwaggerScheme string `env:"SWAGGER_SCHEME" envDefault:"http"`
 }
 
 // Load reads configuration from environment variables.
