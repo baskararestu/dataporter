@@ -17,8 +17,6 @@ func Setup(level string) {
 		lvl = zerolog.InfoLevel
 	}
 	zerolog.SetGlobalLevel(lvl)
-	log.Logger = log.Output(zerolog.ConsoleWriter{
-		Out:        os.Stdout,
-		TimeFormat: time.RFC3339,
-	})
+	zerolog.TimeFieldFormat = time.RFC3339
+	log.Logger = zerolog.New(os.Stdout).With().Timestamp().Logger()
 }
