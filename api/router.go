@@ -1,10 +1,17 @@
 package api
 
-import "net/http"
+import (
+	"net/http"
+
+	httpSwagger "github.com/swaggo/http-swagger"
+)
 
 // NewRouter wires all HTTP routes to their handlers.
 func NewRouter(h *Handler) *http.ServeMux {
 	mux := http.NewServeMux()
+
+	// Swagger UI — accessible at /swagger/index.html
+	mux.Handle("GET /swagger/", httpSwagger.WrapHandler)
 
 	// Job lifecycle
 	mux.HandleFunc("POST /api/jobs", h.CreateJob)

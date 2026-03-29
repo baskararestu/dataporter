@@ -1,0 +1,418 @@
+basePath: /
+definitions:
+  model.CreateJobRequest:
+    properties:
+      batch_delay_ms:
+        example: 0
+        type: integer
+      batch_size:
+        example: 5000
+        type: integer
+      dry_run:
+        example: false
+        type: boolean
+      source_table:
+        example: pasien
+        type: string
+      target_table:
+        example: pasien
+        type: string
+    type: object
+  model.ErrorResponse:
+    properties:
+      error:
+        example: invalid_request
+        type: string
+      message:
+        example: source_table and target_table are required
+        type: string
+    type: object
+  model.HealthResponse:
+    properties:
+      status:
+        example: ok
+        type: string
+      time:
+        type: string
+    type: object
+  model.JobErrorsResponse:
+    properties:
+      errors:
+        items: {}
+        type: array
+      job_id:
+        type: string
+      total:
+        type: integer
+    type: object
+  model.JobStatus:
+    enum:
+    - pending
+    - running
+    - paused
+    - completed
+    - failed
+    - rolled_back
+    type: string
+    x-enum-varnames:
+    - JobStatusPending
+    - JobStatusRunning
+    - JobStatusPaused
+    - JobStatusCompleted
+    - JobStatusFailed
+    - JobStatusRolledBack
+  model.ListJobsResponse:
+    properties:
+      jobs:
+        items:
+          $ref: '#/definitions/model.MigrationJob'
+        type: array
+      total:
+        type: integer
+    type: object
+  model.ListTablesResponse:
+    properties:
+      supported:
+        items:
+          type: string
+        type: array
+    type: object
+  model.MigrationJob:
+    properties:
+      batch_delay_ms:
+        type: integer
+      batch_size:
+        type: integer
+      completed_at:
+        type: string
+      created_at:
+        type: string
+      dry_run:
+        type: boolean
+      error_log:
+        description: JSONB stored as raw bytes
+        items:
+          type: integer
+        type: array
+      failed:
+        type: integer
+      first_processed_id:
+        type: integer
+      job_id:
+        type: string
+      last_processed_id:
+        type: integer
+      processed:
+        type: integer
+      rolled_back_at:
+        type: string
+      source_table:
+        type: string
+      started_at:
+        type: string
+      status:
+        $ref: '#/definitions/model.JobStatus'
+      success:
+        type: integer
+      target_table:
+        type: string
+      total_records:
+        type: integer
+      updated_at:
+        type: string
+    type: object
+  model.StatusResponse:
+    properties:
+      job_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      status:
+        example: starting
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    name: Baskara Restu
+  description: REST API for migrating patient records from EMR PostgreSQL to SIMRS
+    with schema transformation.
+  license:
+    name: MIT
+  title: DataPorter API
+  version: "1.0"
+paths:
+  /api/jobs:
+    get:
+      description: Returns all migration jobs. Optionally filter by status query parameter.
+      parameters:
+      - description: Filter by status (pending, running, paused, completed, failed,
+          rolled_back)
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.ListJobsResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: List migration jobs
+      tags:
+      - jobs
+    post:
+      consumes:
+      - application/json
+      description: Creates a new migration job in pending state. The job will not
+        start until POST /api/jobs/{job_id}/start is called.
+      parameters:
+      - description: Job parameters
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/model.CreateJobRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/model.MigrationJob'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Create migration job
+      tags:
+      - jobs
+  /api/jobs/{job_id}:
+    get:
+      description: Returns full details of a migration job. If the job is currently
+        running, also includes live progress counters.
+      parameters:
+      - description: Job UUID
+        in: path
+        name: job_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.MigrationJob'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Get migration job
+      tags:
+      - jobs
+  /api/jobs/{job_id}/errors:
+    get:
+      description: Returns the full error log for a migration job as a JSON array.
+      parameters:
+      - description: Job UUID
+        in: path
+        name: job_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.JobErrorsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Get job errors
+      tags:
+      - jobs
+  /api/jobs/{job_id}/rollback:
+    post:
+      description: Deletes all rows migrated by this job from the target DB and marks
+        the job as rolled_back.
+      parameters:
+      - description: Job UUID
+        in: path
+        name: job_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.StatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Rollback migration job
+      tags:
+      - jobs
+  /api/jobs/{job_id}/start:
+    post:
+      description: Starts or resumes a pending/paused migration job asynchronously.
+      parameters:
+      - description: Job UUID
+        in: path
+        name: job_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/model.StatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Start migration job
+      tags:
+      - jobs
+  /api/jobs/{job_id}/stop:
+    post:
+      description: Signals a running migration job to pause. It can be resumed with
+        the start endpoint.
+      parameters:
+      - description: Job UUID
+        in: path
+        name: job_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.StatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Stop (pause) migration job
+      tags:
+      - jobs
+  /api/jobs/{job_id}/validate:
+    get:
+      description: Runs a post-migration row count comparison between source and target
+        for the given job's ID range.
+      parameters:
+      - description: Job UUID
+        in: path
+        name: job_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Validate migration job
+      tags:
+      - jobs
+  /api/tables:
+    get:
+      description: Returns all source→target table pairs that the migrator supports.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.ListTablesResponse'
+      summary: List supported tables
+      tags:
+      - metadata
+  /healthz:
+    get:
+      description: Returns HTTP 200 with status ok if the service is up.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.HealthResponse'
+      summary: Health check
+      tags:
+      - metadata
+swagger: "2.0"

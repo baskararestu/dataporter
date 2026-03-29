@@ -1,4 +1,4 @@
-.PHONY: up down build test lint clean
+.PHONY: up down build test lint clean swag
 
 # Start local dev environment (2 PG + app)
 up:
@@ -32,6 +32,10 @@ clean:
 # Tidy dependencies
 tidy:
 	go mod tidy
+
+# Regenerate Swagger docs (requires: go install github.com/swaggo/swag/cmd/swag@v1.16.4)
+swag:
+	swag init --generalInfo main.go --output docs --parseDependency --parseInternal
 
 # View logs
 logs:

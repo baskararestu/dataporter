@@ -47,6 +47,19 @@ func NewHandler(
 }
 
 // CreateJob creates a new migration job in pending state.
+//
+// @Summary      Create migration job
+// @Description  Creates a new migration job in pending state. The job will not start until POST /api/jobs/{job_id}/start is called.
+// @Tags         jobs
+// @Accept       json
+// @Produce      json
+// @Param        body  body      model.CreateJobRequest  true  "Job parameters"
+// @Success      201   {object}  model.MigrationJob
+// @Failure      400   {object}  model.ErrorResponse
+// @Failure      409   {object}  model.ErrorResponse
+// @Failure      422   {object}  model.ErrorResponse
+// @Failure      500   {object}  model.ErrorResponse
+// @Router       /api/jobs [post]
 func (h *Handler) CreateJob(w http.ResponseWriter, r *http.Request) {
 	var req model.CreateJobRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -74,6 +87,17 @@ func (h *Handler) CreateJob(w http.ResponseWriter, r *http.Request) {
 }
 
 // StartJob begins (or resumes) a migration job in a background goroutine.
+//
+// @Summary      Start migration job
+// @Description  Starts or resumes a pending/paused migration job asynchronously.
+// @Tags         jobs
+// @Produce      json
+// @Param        job_id  path      string  true  "Job UUID"
+// @Success      202     {object}  model.StatusResponse
+// @Failure      400     {object}  model.ErrorResponse
+// @Failure      404     {object}  model.ErrorResponse
+// @Failure      409     {object}  model.ErrorResponse
+// @Router       /api/jobs/{job_id}/start [post]
 func (h *Handler) StartJob(w http.ResponseWriter, r *http.Request) {
 	jobID, ok := parseJobID(w, r)
 	if !ok {
@@ -101,6 +125,18 @@ func (h *Handler) StartJob(w http.ResponseWriter, r *http.Request) {
 }
 
 // StopJob signals the running job to pause.
+//
+// @Summary      Stop (pause) migration job
+// @Description  Signals a running migration job to pause. It can be resumed with the start endpoint.
+// @Tags         jobs
+// @Produce      json
+// @Param        job_id  path      string  true  "Job UUID"
+// @Success      200     {object}  model.StatusResponse
+// @Failure      400     {object}  model.ErrorResponse
+// @Failure      404     {object}  model.ErrorResponse
+// @Failure      409     {object}  model.ErrorResponse
+// @Failure      500     {object}  model.ErrorResponse
+// @Router       /api/jobs/{job_id}/stop [post]
 func (h *Handler) StopJob(w http.ResponseWriter, r *http.Request) {
 	jobID, ok := parseJobID(w, r)
 	if !ok {
@@ -123,6 +159,17 @@ func (h *Handler) StopJob(w http.ResponseWriter, r *http.Request) {
 }
 
 // RollbackJob deletes all migrated data for the job and marks it rolled_back.
+//
+// @Summary      Rollback migration job
+// @Description  Deletes all rows migrated by this job from the target DB and marks the job as rolled_back.
+// @Tags         jobs
+// @Produce      json
+// @Param        job_id  path      string  true  "Job UUID"
+// @Success      200     {object}  model.StatusResponse
+// @Failure      400     {object}  model.ErrorResponse
+// @Failure      409     {object}  model.ErrorResponse
+// @Failure      500     {object}  model.ErrorResponse
+// @Router       /api/jobs/{job_id}/rollback [post]
 func (h *Handler) RollbackJob(w http.ResponseWriter, r *http.Request) {
 	jobID, ok := parseJobID(w, r)
 	if !ok {
@@ -140,6 +187,15 @@ func (h *Handler) RollbackJob(w http.ResponseWriter, r *http.Request) {
 }
 
 // ListJobs returns all jobs, optionally filtered by ?status=.
+//
+// @Summary      List migration jobs
+// @Description  Returns all migration jobs. Optionally filter by status query parameter.
+// @Tags         jobs
+// @Produce      json
+// @Param        status  query     string  false  "Filter by status (pending, running, paused, completed, failed, rolled_back)"
+// @Success      200     {object}  model.ListJobsResponse
+// @Failure      500     {object}  model.ErrorResponse
+// @Router       /api/jobs [get]
 func (h *Handler) ListJobs(w http.ResponseWriter, r *http.Request) {
 	status := r.URL.Query().Get("status")
 	jobs, err := h.jobRepo.List(r.Context(), status)
@@ -151,6 +207,16 @@ func (h *Handler) ListJobs(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetJob returns full details and live progress for a single job.
+//
+// @Summary      Get migration job
+// @Description  Returns full details of a migration job. If the job is currently running, also includes live progress counters.
+// @Tags         jobs
+// @Produce      json
+// @Param        job_id  path      string  true  "Job UUID"
+// @Success      200     {object}  model.MigrationJob
+// @Failure      400     {object}  model.ErrorResponse
+// @Failure      404     {object}  model.ErrorResponse
+// @Router       /api/jobs/{job_id} [get]
 func (h *Handler) GetJob(w http.ResponseWriter, r *http.Request) {
 	jobID, ok := parseJobID(w, r)
 	if !ok {
@@ -182,6 +248,17 @@ func (h *Handler) GetJob(w http.ResponseWriter, r *http.Request) {
 }
 
 // ValidateJob runs a post-migration count check for the job.
+//
+// @Summary      Validate migration job
+// @Description  Runs a post-migration row count comparison between source and target for the given job's ID range.
+// @Tags         jobs
+// @Produce      json
+// @Param        job_id  path      string  true  "Job UUID"
+// @Success      200     {object}  map[string]any
+// @Failure      400     {object}  model.ErrorResponse
+// @Failure      404     {object}  model.ErrorResponse
+// @Failure      500     {object}  model.ErrorResponse
+// @Router       /api/jobs/{job_id}/validate [get]
 func (h *Handler) ValidateJob(w http.ResponseWriter, r *http.Request) {
 	jobID, ok := parseJobID(w, r)
 	if !ok {
@@ -202,6 +279,16 @@ func (h *Handler) ValidateJob(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetJobErrors returns the error_log JSONB for a job as a parsed array.
+//
+// @Summary      Get job errors
+// @Description  Returns the full error log for a migration job as a JSON array.
+// @Tags         jobs
+// @Produce      json
+// @Param        job_id  path      string  true  "Job UUID"
+// @Success      200     {object}  model.JobErrorsResponse
+// @Failure      400     {object}  model.ErrorResponse
+// @Failure      404     {object}  model.ErrorResponse
+// @Router       /api/jobs/{job_id}/errors [get]
 func (h *Handler) GetJobErrors(w http.ResponseWriter, r *http.Request) {
 	jobID, ok := parseJobID(w, r)
 	if !ok {
@@ -220,11 +307,25 @@ func (h *Handler) GetJobErrors(w http.ResponseWriter, r *http.Request) {
 }
 
 // ListTables returns all supported source->target migration pairs.
+//
+// @Summary      List supported tables
+// @Description  Returns all source→target table pairs that the migrator supports.
+// @Tags         metadata
+// @Produce      json
+// @Success      200  {object}  model.ListTablesResponse
+// @Router       /api/tables [get]
 func (h *Handler) ListTables(w http.ResponseWriter, _ *http.Request) {
 	jsonOK(w, http.StatusOK, map[string]any{"supported": migration.SupportedTables()})
 }
 
 // Healthz returns 200 if the service is alive.
+//
+// @Summary      Health check
+// @Description  Returns HTTP 200 with status ok if the service is up.
+// @Tags         metadata
+// @Produce      json
+// @Success      200  {object}  model.HealthResponse
+// @Router       /healthz [get]
 func (h *Handler) Healthz(w http.ResponseWriter, _ *http.Request) {
 	jsonOK(w, http.StatusOK, map[string]any{"status": "ok", "time": time.Now().UTC()})
 }
