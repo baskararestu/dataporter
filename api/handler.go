@@ -70,6 +70,9 @@ func (h *Handler) CreateJob(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusBadRequest, "source_table and target_table are required")
 		return
 	}
+	if req.BatchSize <= 0 {
+		req.BatchSize = 5000
+	}
 	if _, err := migration.LookupTable(req.SourceTable); err != nil {
 		jsonError(w, http.StatusUnprocessableEntity, err.Error())
 		return

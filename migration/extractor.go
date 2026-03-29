@@ -20,13 +20,23 @@ type Extractor struct {
 
 // NewExtractor opens a REPEATABLE READ transaction on the source connection and
 // declares a cursor starting after lastProcessedID (for checkpoint resume).
-func NewExtractor(ctx context.Context, conn *pgx.Conn, lastProcessedID int64, batchSize int) (*Extractor, error) {
+// Also returns the total row count within the same snapshot to avoid TOCTOU mismatch.
+func NewExtractor(ctx context.Context, conn *pgx.Conn, lastProcessedID int64, batchSize int) (*Extractor, int64, error) {
 	tx, err := conn.BeginTx(ctx, pgx.TxOptions{
 		IsoLevel:   pgx.RepeatableRead,
 		AccessMode: pgx.ReadOnly,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("begin source tx: %w", err)
+		return nil, 0, fmt.Errorf("begin source tx: %w", err)
+	}
+
+	// Count total INSIDE the snapshot — same transaction, same consistent view as cursor.
+	var total int64
+	if err := tx.QueryRow(ctx,
+		`SELECT COUNT(id_pasien) FROM pasien WHERE id_pasien > $1`, lastProcessedID,
+	).Scan(&total); err != nil {
+		_ = tx.Rollback(ctx)
+		return nil, 0, fmt.Errorf("count total: %w", err)
 	}
 
 	cursorName := "migration_cursor"
@@ -42,14 +52,14 @@ func NewExtractor(ctx context.Context, conn *pgx.Conn, lastProcessedID int64, ba
 	))
 	if err != nil {
 		_ = tx.Rollback(ctx)
-		return nil, fmt.Errorf("declare cursor: %w", err)
+		return nil, 0, fmt.Errorf("declare cursor: %w", err)
 	}
 
 	return &Extractor{
 		tx:         tx,
 		cursorName: cursorName,
 		batchSize:  batchSize,
-	}, nil
+	}, total, nil
 }
 
 // FetchBatch retrieves the next batch of rows from the cursor.
@@ -85,19 +95,6 @@ func (e *Extractor) FetchBatch(ctx context.Context) ([]model.EMRPasien, error) {
 		e.done = true
 	}
 	return batch, nil
-}
-
-// CountTotal returns the total number of source rows to be migrated (for progress tracking).
-// Called once before the batch loop to set job.total_records.
-func CountTotal(ctx context.Context, conn *pgx.Conn, lastProcessedID int64) (int64, error) {
-	var count int64
-	err := conn.QueryRow(ctx,
-		`SELECT COUNT(*) FROM pasien WHERE id_pasien > $1`, lastProcessedID,
-	).Scan(&count)
-	if err != nil {
-		return 0, fmt.Errorf("count total: %w", err)
-	}
-	return count, nil
 }
 
 // Close commits the source transaction (closes the cursor) and releases the connection.

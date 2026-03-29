@@ -61,23 +61,20 @@ func (m *Migrator) Run(ctx context.Context, job *model.MigrationJob) error {
 		return fmt.Errorf("set running: %w", err)
 	}
 
-	total, err := CountTotal(ctx, m.sourceConn, job.LastProcessedID)
+	// Open server-side cursor on source DB (REPEATABLE READ snapshot).
+	// CountTotal runs inside the same transaction — count and cursor see identical data.
+	extractor, total, err := NewExtractor(ctx, m.sourceConn, job.LastProcessedID, job.BatchSize)
 	if err != nil {
-		return fmt.Errorf("count total: %w", err)
+		return err
 	}
+	defer func() { _ = extractor.Close(ctx) }()
+
 	if err := m.jobRepo.SetTotalRecords(ctx, job.JobID, total); err != nil {
 		return fmt.Errorf("set total records: %w", err)
 	}
 	m.tracker.SetTotal(job.JobID, total)
 
 	log.Info().Str("job_id", job.JobID.String()).Int64("total", total).Msg("source count complete")
-
-	// Open server-side cursor on source DB (REPEATABLE READ snapshot).
-	extractor, err := NewExtractor(ctx, m.sourceConn, job.LastProcessedID, job.BatchSize)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = extractor.Close(ctx) }()
 
 	batchNum := 0
 	for {

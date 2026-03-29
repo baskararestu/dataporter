@@ -39,7 +39,7 @@ func NewValidator(sourceConn *pgx.Conn, targetDB *pgxpool.Pool) *Validator {
 func (v *Validator) Verify(ctx context.Context, jobID uuid.UUID, sourceTable string, firstID, lastID, jobSuccess, jobSkipped int64) (*VerifyResult, error) {
 	var sourceCount int64
 	err := v.sourceConn.QueryRow(ctx,
-		`SELECT COUNT(*) FROM pasien WHERE id_pasien BETWEEN $1 AND $2`,
+		`SELECT COUNT(id_pasien) FROM pasien WHERE id_pasien BETWEEN $1 AND $2`,
 		firstID, lastID,
 	).Scan(&sourceCount)
 	if err != nil {
