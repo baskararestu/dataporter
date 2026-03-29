@@ -50,7 +50,8 @@ func (m *Migrator) Run(ctx context.Context, job *model.MigrationJob) error {
 		Str("source", job.SourceTable).Str("target", job.TargetTable).
 		Msg("migration started")
 
-	if _, err := LookupTable(job.SourceTable); err != nil {
+	tableInfo, err := LookupTable(job.SourceTable)
+	if err != nil {
 		return err
 	}
 
@@ -62,7 +63,8 @@ func (m *Migrator) Run(ctx context.Context, job *model.MigrationJob) error {
 	// Open server-side cursor on source DB (REPEATABLE READ snapshot).
 	// CountTotal runs inside the same transaction — count and cursor see identical data.
 	// NewExtractor acquires a dedicated conn from the pool; Close() releases it.
-	extractor, total, err := NewExtractor(ctx, m.sourcePool, job.LastProcessedID, job.BatchSize)
+	// SQL is sourced from registry so extractor stays generic across tables.
+	extractor, total, err := NewExtractor(ctx, m.sourcePool, job.LastProcessedID, job.BatchSize, tableInfo.SelectSQL, tableInfo.CountSQL)
 	if err != nil {
 		return err
 	}

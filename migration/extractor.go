@@ -27,8 +27,14 @@ type Extractor struct {
 // transaction, and declares a cursor starting after lastProcessedID (for checkpoint resume).
 // Also returns the total row count within the same snapshot to avoid TOCTOU mismatch.
 //
+// selectSQL must be the cursor query body with %d as a placeholder for lastProcessedID —
+// pgx does not support parameters in DECLARE ... CURSOR FOR SELECT, so the ID is interpolated
+// with fmt.Sprintf before the DECLARE statement is executed.
+//
+// countSQL must use $1 for the lastProcessedID parameter.
+//
 // The caller MUST call Close() to release the connection back to the pool.
-func NewExtractor(ctx context.Context, pool *pgxpool.Pool, lastProcessedID int64, batchSize int) (*Extractor, int64, error) {
+func NewExtractor(ctx context.Context, pool *pgxpool.Pool, lastProcessedID int64, batchSize int, selectSQL, countSQL string) (*Extractor, int64, error) {
 	// Acquire a dedicated connection — cursors are connection-scoped.
 	conn, err := pool.Acquire(ctx)
 	if err != nil {
@@ -46,9 +52,7 @@ func NewExtractor(ctx context.Context, pool *pgxpool.Pool, lastProcessedID int64
 
 	// Count total INSIDE the snapshot — same transaction, same consistent view as cursor.
 	var total int64
-	if err := tx.QueryRow(ctx,
-		`SELECT COUNT(id_pasien) FROM pasien WHERE id_pasien > $1`, lastProcessedID,
-	).Scan(&total); err != nil {
+	if err := tx.QueryRow(ctx, countSQL, lastProcessedID).Scan(&total); err != nil {
 		_ = tx.Rollback(ctx)
 		conn.Release()
 		return nil, 0, fmt.Errorf("count total: %w", err)
@@ -56,14 +60,9 @@ func NewExtractor(ctx context.Context, pool *pgxpool.Pool, lastProcessedID int64
 
 	cursorName := "migration_cursor"
 	_, err = tx.Exec(ctx, fmt.Sprintf(
-		`DECLARE %s CURSOR FOR
-		 SELECT id_pasien, nama_depan, nama_belakang, tanggal_lahir, jenis_kelamin,
-		        email, no_telepon, alamat, kota, provinsi, kode_pos,
-		        golongan_darah, kontak_darurat, no_kontak_darurat, tanggal_registrasi
-		 FROM pasien
-		 WHERE id_pasien > %d
-		 ORDER BY id_pasien ASC`,
-		cursorName, lastProcessedID,
+		"DECLARE %s CURSOR FOR %s",
+		cursorName,
+		fmt.Sprintf(selectSQL, lastProcessedID),
 	))
 	if err != nil {
 		_ = tx.Rollback(ctx)

@@ -19,6 +19,10 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// maxConcurrentJobs is the maximum number of migration goroutines that may run simultaneously.
+// Requests beyond this limit are rejected with HTTP 429.
+const maxConcurrentJobs = 5
+
 // Handler holds all HTTP handler dependencies.
 type Handler struct {
 	appCtx      context.Context
@@ -33,6 +37,9 @@ type Handler struct {
 	// activeJobs stores context.CancelFunc per running job UUID.
 	// StopJob calls the cancel func to actually stop the goroutine.
 	activeJobs sync.Map // map[uuid.UUID]context.CancelFunc
+	// sem is a buffered channel used as a counting semaphore to cap concurrent migration jobs.
+	// Acquire: send to channel. Release: receive from channel.
+	sem chan struct{}
 }
 
 // NewHandler creates a new API handler.
@@ -57,6 +64,7 @@ func NewHandler(
 		sourceDBCfg: sourceDBCfg,
 		emrExtraSQL: emrExtraSQL,
 		appEnv:      appEnv,
+		sem:         make(chan struct{}, maxConcurrentJobs),
 	}
 }
 
@@ -151,6 +159,14 @@ func (h *Handler) StartJob(w http.ResponseWriter, r *http.Request) {
 	log.Info().Str("job_id", jobID.String()).Str("source", job.SourceTable).Str("target", job.TargetTable).
 		Str("current_status", string(job.Status)).Msg("starting migration job")
 
+	// Acquire semaphore slot — reject immediately if at capacity.
+	select {
+	case h.sem <- struct{}{}:
+	default:
+		jsonError(w, http.StatusTooManyRequests, "max concurrent migrations reached, try again later")
+		return
+	}
+
 	// Create a per-job context so StopJob can cancel this goroutine independently
 	// from the global app context. Derive from appCtx so SIGTERM still stops everything.
 	jobCtx, cancel := context.WithCancel(h.appCtx)
@@ -158,7 +174,8 @@ func (h *Handler) StartJob(w http.ResponseWriter, r *http.Request) {
 
 	go func() {
 		defer func() {
-			// Always clean up: release cancel func and drain tracker.
+			// Always clean up: release semaphore slot, cancel func, and tracker entry.
+			<-h.sem
 			h.activeJobs.Delete(jobID)
 			cancel()
 		}()
