@@ -35,7 +35,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
-	db, err := database.Connect(ctx, cfg.SourceDSN, cfg.TargetDSN)
+	db, err := database.Connect(ctx, cfg.Source.DSN(), cfg.Target.DSN())
 	if err != nil {
 		log.Fatal().Err(err).Msg("database connection failed")
 	}

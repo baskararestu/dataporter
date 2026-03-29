@@ -6,22 +6,39 @@ import (
 	"github.com/caarlos0/env/v11"
 )
 
+// DBConfig holds individual connection parameters for one PostgreSQL instance.
+// The DSN is assembled from these fields via DSN().
+type DBConfig struct {
+	Host     string `env:"HOST,required"`
+	Port     int    `env:"PORT,required"`
+	User     string `env:"USER,required"`
+	Password string `env:"PASSWORD,required"`
+	Name     string `env:"NAME,required"`
+	SSLMode  string `env:"SSL_MODE" envDefault:"disable"`
+}
+
+// DSN returns a fully-formed PostgreSQL connection string.
+func (d DBConfig) DSN() string {
+	return fmt.Sprintf(
+		"postgres://%s:%s@%s:%d/%s?sslmode=%s",
+		d.User, d.Password, d.Host, d.Port, d.Name, d.SSLMode,
+	)
+}
+
 type Config struct {
-	// SourceDSN is the PostgreSQL connection string for the EMR database (read-only source).
-	SourceDSN string `env:"SOURCE_DSN,required"`
+	// Source is the EMR database (read-only).
+	Source DBConfig `envPrefix:"EMR_DB_"`
 
-	// TargetDSN is the PostgreSQL connection string for the SIMRS database (write target).
-	TargetDSN string `env:"TARGET_DSN,required"`
+	// Target is the SIMRS database (read-write).
+	Target DBConfig `envPrefix:"SIMRS_DB_"`
 
-	// BatchSize is the default number of rows fetched per cursor FETCH.
-	// Can be overridden per-job via POST /api/jobs body.
+	// BatchSize is the number of rows fetched per cursor FETCH.
 	BatchSize int `env:"BATCH_SIZE" envDefault:"5000"`
 
-	// BatchDelayMs is the default delay in milliseconds between batches (backpressure).
-	// 0 = no delay. Can be overridden per-job via POST /api/jobs body.
+	// BatchDelayMs is the delay in milliseconds between batches (backpressure).
 	BatchDelayMs int `env:"BATCH_DELAY_MS" envDefault:"0"`
 
-	// HTTPPort is the port the monitoring/control API listens on.
+	// HTTPPort is the port the API server listens on.
 	HTTPPort int `env:"HTTP_PORT" envDefault:"8080"`
 
 	// LogLevel controls zerolog output level (debug, info, warn, error).
@@ -29,7 +46,6 @@ type Config struct {
 }
 
 // Load reads configuration from environment variables.
-// Returns an error if required variables (SOURCE_DSN, TARGET_DSN) are missing.
 func Load() (*Config, error) {
 	var cfg Config
 	if err := env.Parse(&cfg); err != nil {
@@ -37,3 +53,4 @@ func Load() (*Config, error) {
 	}
 	return &cfg, nil
 }
+

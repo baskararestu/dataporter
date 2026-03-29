@@ -46,8 +46,18 @@ services:
   migration:
     build: .
     environment:
-      SOURCE_DSN: ${SOURCE_DSN}
-      TARGET_DSN: ${TARGET_DSN}
+      EMR_DB_HOST: postgres_emr
+      EMR_DB_PORT: 5432
+      EMR_DB_USER: ${EMR_DB_USER:-emr_user}
+      EMR_DB_PASSWORD: ${EMR_DB_PASSWORD:-emr_pass}
+      EMR_DB_NAME: ${EMR_DB_NAME:-database_emr}
+      EMR_DB_SSL_MODE: disable
+      SIMRS_DB_HOST: postgres_simrs
+      SIMRS_DB_PORT: 5432
+      SIMRS_DB_USER: ${SIMRS_DB_USER:-simrs_user}
+      SIMRS_DB_PASSWORD: ${SIMRS_DB_PASSWORD:-simrs_pass}
+      SIMRS_DB_NAME: ${SIMRS_DB_NAME:-database_simrs}
+      SIMRS_DB_SSL_MODE: disable
       BATCH_SIZE: ${BATCH_SIZE:-5000}
       BATCH_DELAY_MS: ${BATCH_DELAY_MS:-0}
       HTTP_PORT: ${HTTP_PORT:-8080}
