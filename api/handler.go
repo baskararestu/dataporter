@@ -89,21 +89,20 @@ func (h *Handler) CreateJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.StartFromID == 0 {
-		if prev, err := h.jobRepo.GetLatestCompleted(r.Context(), req.SourceTable, req.TargetTable); err == nil && prev != nil {
-			if prev.Processed >= prev.TotalRecords && prev.TotalRecords > 0 {
-				// Previous job fully migrated — auto-set checkpoint to continue from where it left off.
-				req.StartFromID = prev.LastProcessedID
-				log.Info().Str("source_table", req.SourceTable).
-					Int64("start_from_id", req.StartFromID).
-					Msg("incremental migration: continuing from previous job checkpoint")
-			}
+	// Auto-detect checkpoint from last completed job for this source+target pair.
+	var startFromID int64
+	if prev, err := h.jobRepo.GetLatestCompleted(r.Context(), req.SourceTable, req.TargetTable); err == nil && prev != nil {
+		if prev.Processed >= prev.TotalRecords && prev.TotalRecords > 0 {
+			startFromID = prev.LastProcessedID
+			log.Info().Str("source_table", req.SourceTable).
+				Int64("start_from_id", startFromID).
+				Msg("incremental migration: continuing from previous job checkpoint")
 		}
 	}
 
 	log.Info().Str("source_table", req.SourceTable).Str("target_table", req.TargetTable).
 		Int("batch_size", req.BatchSize).Bool("dry_run", req.DryRun).Msg("creating migration job")
-	job, err := h.jobRepo.Create(r.Context(), req)
+	job, err := h.jobRepo.Create(r.Context(), req, startFromID)
 	if err != nil {
 		if strings.Contains(err.Error(), "23505") {
 			jsonError(w, http.StatusConflict, "an active job for this source+target already exists")

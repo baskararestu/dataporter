@@ -45,13 +45,15 @@ type MigrationJob struct {
 }
 
 // CreateJobRequest holds the parameters for creating a new migration job via the API.
+//
+// All fields except source_table and target_table are optional.
+// The migration checkpoint is auto-detected from the last completed job — no need to specify it.
 type CreateJobRequest struct {
-	SourceTable  string `json:"source_table"  example:"pasien"`
-	TargetTable  string `json:"target_table"  example:"pasien"`
-	BatchSize    int    `json:"batch_size"    example:"5000"`
-	BatchDelayMs int    `json:"batch_delay_ms" example:"0"`
-	DryRun       bool   `json:"dry_run"       example:"false"`
-	StartFromID  int64  `json:"start_from_id" example:"0"`
+	SourceTable  string `json:"source_table"             example:"pasien"`
+	TargetTable  string `json:"target_table"             example:"pasien"`
+	BatchSize    int    `json:"batch_size,omitempty"     example:"5000"`
+	BatchDelayMs int    `json:"batch_delay_ms,omitempty" example:"0"`
+	DryRun       bool   `json:"dry_run,omitempty"        example:"false"`
 }
 
 // APIResponse is the standard response envelope for all API endpoints.

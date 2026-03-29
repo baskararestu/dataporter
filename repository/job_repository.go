@@ -24,7 +24,7 @@ func NewJobRepository(db *pgxpool.Pool) *JobRepository {
 // Create inserts a new migration job with status 'pending' and returns it.
 // Returns an error wrapping pgconn.PgError with code 23505 if a duplicate active job exists
 // (enforced by idx_migration_jobs_active_unique partial unique index → caller returns 409).
-func (r *JobRepository) Create(ctx context.Context, req model.CreateJobRequest) (*model.MigrationJob, error) {
+func (r *JobRepository) Create(ctx context.Context, req model.CreateJobRequest, startFromID int64) (*model.MigrationJob, error) {
 	const q = `
 		INSERT INTO migration.migration_jobs
 			(source_table, target_table, batch_size, batch_delay_ms, dry_run, last_processed_id)
@@ -37,7 +37,7 @@ func (r *JobRepository) Create(ctx context.Context, req model.CreateJobRequest) 
 
 	row := r.db.QueryRow(ctx, q,
 		req.SourceTable, req.TargetTable,
-		req.BatchSize, req.BatchDelayMs, req.DryRun, req.StartFromID,
+		req.BatchSize, req.BatchDelayMs, req.DryRun, startFromID,
 	)
 	return scanJob(row)
 }
