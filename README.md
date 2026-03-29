@@ -87,34 +87,34 @@ All variables are **required** unless a default is noted.
 
 ### EMR Database (source — read-only)
 
-| Variable | Default | Description |
-|---|---|---|
-| `EMR_DB_HOST` | — | PostgreSQL host |
-| `EMR_DB_PORT` | — | PostgreSQL port |
-| `EMR_DB_USER` | — | Database user |
-| `EMR_DB_PASSWORD` | — | Database password |
-| `EMR_DB_NAME` | — | Database name |
-| `EMR_DB_SSL_MODE` | `disable` | SSL mode |
+| Variable          | Default   | Description       |
+| ----------------- | --------- | ----------------- |
+| `EMR_DB_HOST`     | —         | PostgreSQL host   |
+| `EMR_DB_PORT`     | —         | PostgreSQL port   |
+| `EMR_DB_USER`     | —         | Database user     |
+| `EMR_DB_PASSWORD` | —         | Database password |
+| `EMR_DB_NAME`     | —         | Database name     |
+| `EMR_DB_SSL_MODE` | `disable` | SSL mode          |
 
 ### SIMRS Database (target — read-write)
 
-| Variable | Default | Description |
-|---|---|---|
-| `SIMRS_DB_HOST` | — | PostgreSQL host |
-| `SIMRS_DB_PORT` | — | PostgreSQL port |
-| `SIMRS_DB_USER` | — | Database user |
-| `SIMRS_DB_PASSWORD` | — | Database password |
-| `SIMRS_DB_NAME` | — | Database name |
-| `SIMRS_DB_SSL_MODE` | `disable` | SSL mode |
+| Variable            | Default   | Description       |
+| ------------------- | --------- | ----------------- |
+| `SIMRS_DB_HOST`     | —         | PostgreSQL host   |
+| `SIMRS_DB_PORT`     | —         | PostgreSQL port   |
+| `SIMRS_DB_USER`     | —         | Database user     |
+| `SIMRS_DB_PASSWORD` | —         | Database password |
+| `SIMRS_DB_NAME`     | —         | Database name     |
+| `SIMRS_DB_SSL_MODE` | `disable` | SSL mode          |
 
 ### Application
 
-| Variable | Default | Description |
-|---|---|---|
-| `BATCH_SIZE` | `5000` | Rows fetched per cursor FETCH |
-| `BATCH_DELAY_MS` | `0` | Delay (ms) between batches (backpressure) |
-| `HTTP_PORT` | `8080` | API server port |
-| `LOG_LEVEL` | `info` | Log level: `debug`, `info`, `warn`, `error` |
+| Variable         | Default | Description                                 |
+| ---------------- | ------- | ------------------------------------------- |
+| `BATCH_SIZE`     | `5000`  | Rows fetched per cursor FETCH               |
+| `BATCH_DELAY_MS` | `0`     | Delay (ms) between batches (backpressure)   |
+| `HTTP_PORT`      | `8080`  | API server port                             |
+| `LOG_LEVEL`      | `info`  | Log level: `debug`, `info`, `warn`, `error` |
 
 ---
 
@@ -124,23 +124,23 @@ Swagger UI: **`http://localhost:8080/swagger/index.html`**
 
 ### Jobs
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/jobs` | Create a new migration job (pending state) |
-| `POST` | `/api/jobs/{job_id}/start` | Start or resume a job |
-| `POST` | `/api/jobs/{job_id}/stop` | Pause a running job |
+| Method | Endpoint                      | Description                                  |
+| ------ | ----------------------------- | -------------------------------------------- |
+| `POST` | `/api/jobs`                   | Create a new migration job (pending state)   |
+| `POST` | `/api/jobs/{job_id}/start`    | Start or resume a job                        |
+| `POST` | `/api/jobs/{job_id}/stop`     | Pause a running job                          |
 | `POST` | `/api/jobs/{job_id}/rollback` | Delete migrated rows and mark as rolled back |
-| `GET` | `/api/jobs` | List all jobs (optional `?status=` filter) |
-| `GET` | `/api/jobs/{job_id}` | Get job details + live progress counters |
-| `GET` | `/api/jobs/{job_id}/validate` | Compare source vs target row counts |
-| `GET` | `/api/jobs/{job_id}/errors` | Get full error log for a job |
+| `GET`  | `/api/jobs`                   | List all jobs (optional `?status=` filter)   |
+| `GET`  | `/api/jobs/{job_id}`          | Get job details + live progress counters     |
+| `GET`  | `/api/jobs/{job_id}/validate` | Compare source vs target row counts          |
+| `GET`  | `/api/jobs/{job_id}/errors`   | Get full error log for a job                 |
 
 ### Metadata
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/tables` | List supported source→target table pairs |
-| `GET` | `/healthz` | Health check |
+| Method | Endpoint      | Description                              |
+| ------ | ------------- | ---------------------------------------- |
+| `GET`  | `/api/tables` | List supported source→target table pairs |
+| `GET`  | `/healthz`    | Health check                             |
 
 ### Example: run a full migration
 
@@ -164,16 +164,16 @@ curl -s http://localhost:8080/api/jobs/<job_id>/validate
 
 ## Schema Transformation (EMR → SIMRS)
 
-| EMR field | SIMRS field | Transformation |
-|---|---|---|
-| `id` (INT) | `pasien_id` (UUID) | UUID v5 deterministic from source ID |
-| `nama_depan` + `nama_belakang` | `nama_lengkap` | Concatenated, max 100 chars |
-| `tgl_lahir` | `tanggal_lahir` | Direct copy |
-| `jenis_kelamin` | `jenis_kelamin` | Direct copy |
-| `alamat` | `alamat` | Truncated to 255 chars |
-| `no_telepon` | `nomor_telepon` | Direct copy |
-| `email` | `email` | Truncated to 100 chars |
-| `created_at` | `created_at` | Direct copy |
+| EMR field                      | SIMRS field        | Transformation                       |
+| ------------------------------ | ------------------ | ------------------------------------ |
+| `id` (INT)                     | `pasien_id` (UUID) | UUID v5 deterministic from source ID |
+| `nama_depan` + `nama_belakang` | `nama_lengkap`     | Concatenated, max 100 chars          |
+| `tgl_lahir`                    | `tanggal_lahir`    | Direct copy                          |
+| `jenis_kelamin`                | `jenis_kelamin`    | Direct copy                          |
+| `alamat`                       | `alamat`           | Truncated to 255 chars               |
+| `no_telepon`                   | `nomor_telepon`    | Direct copy                          |
+| `email`                        | `email`            | Truncated to 100 chars               |
+| `created_at`                   | `created_at`       | Direct copy                          |
 
 ---
 
