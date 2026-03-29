@@ -109,12 +109,15 @@ All variables are **required** unless a default is noted.
 
 ### Application
 
-| Variable         | Default | Description                                 |
-| ---------------- | ------- | ------------------------------------------- |
-| `BATCH_SIZE`     | `5000`  | Rows fetched per cursor FETCH               |
-| `BATCH_DELAY_MS` | `0`     | Delay (ms) between batches (backpressure)   |
-| `HTTP_PORT`      | `8080`  | API server port                             |
-| `LOG_LEVEL`      | `info`  | Log level: `debug`, `info`, `warn`, `error` |
+| Variable         | Default         | Description                                              |
+| ---------------- | --------------- | -------------------------------------------------------- |
+| `BATCH_SIZE`     | `5000`          | Rows fetched per cursor FETCH                            |
+| `BATCH_DELAY_MS` | `0`             | Delay (ms) between batches (backpressure)                |
+| `HTTP_PORT`      | `8080`          | API server port                                          |
+| `LOG_LEVEL`      | `info`          | Log level: `debug`, `info`, `warn`, `error`              |
+| `SWAGGER_HOST`   | *(from swag)*   | Override Swagger UI host at runtime (e.g. `localhost:8090`) |
+| `SWAGGER_SCHEME` | `http`          | Override Swagger UI scheme (`http` or `https`)           |
+| `APP_ENV`        | `development`   | Set to `production` to disable dev-only endpoints        |
 
 ---
 
@@ -142,6 +145,12 @@ Swagger UI: **`http://localhost:8080/swagger/index.html`**
 | `GET`  | `/api/tables` | List supported source→target table pairs |
 | `GET`  | `/healthz`    | Health check                             |
 
+### Dev
+
+| Method  | Endpoint                    | Description                                                      |
+| ------- | --------------------------- | ---------------------------------------------------------------- |
+| `POST`  | `/api/dev/seed-emr-extra`   | Insert 1.5M extra patients into EMR (dev only, disabled in prod) |
+
 ### Example: run a full migration
 
 ```bash
@@ -160,20 +169,47 @@ curl -s http://localhost:8080/api/jobs/<job_id>
 curl -s http://localhost:8080/api/jobs/<job_id>/validate
 ```
 
+### Example: incremental migration (when EMR grows)
+
+When new patients are added to EMR after a completed migration, simply create a new job — the checkpoint is auto-detected from the previous completed job's `last_processed_id`.
+
+```bash
+# No parameters needed — system detects where to continue automatically
+curl -s -X POST http://localhost:8080/api/jobs \
+  -H "Content-Type: application/json" \
+  -d '{"source_table":"pasien","target_table":"pasien"}'
+
+# Start the incremental job
+curl -s -X POST http://localhost:8080/api/jobs/<job_id>/start
+```
+
+To simulate EMR data growth in dev:
+
+```bash
+curl -s -X POST http://localhost:8080/api/dev/seed-emr-extra
+# Inserts 1.5M patients (IDs 2000001–3500000) into EMR. Idempotent.
+```
+
 ---
 
 ## Schema Transformation (EMR → SIMRS)
 
-| EMR field                      | SIMRS field        | Transformation                       |
-| ------------------------------ | ------------------ | ------------------------------------ |
-| `id` (INT)                     | `pasien_id` (UUID) | UUID v5 deterministic from source ID |
-| `nama_depan` + `nama_belakang` | `nama_lengkap`     | Concatenated, max 100 chars          |
-| `tgl_lahir`                    | `tanggal_lahir`    | Direct copy                          |
-| `jenis_kelamin`                | `jenis_kelamin`    | Direct copy                          |
-| `alamat`                       | `alamat`           | Truncated to 255 chars               |
-| `no_telepon`                   | `nomor_telepon`    | Direct copy                          |
-| `email`                        | `email`            | Truncated to 100 chars               |
-| `created_at`                   | `created_at`       | Direct copy                          |
+| EMR field                          | SIMRS field               | Transformation                              |
+| ---------------------------------- | ------------------------- | ------------------------------------------- |
+| `id_pasien` (INT)                  | `pasien_uuid` (UUID)      | UUID v5 deterministic: `SHA1(ns, id_pasien)` |
+| `nama_depan` + `nama_belakang`     | `nama_lengkap`            | Concatenated, truncated to 100 chars        |
+| `tanggal_lahir`                    | `tanggal_lahir`           | Direct copy                                 |
+| `jenis_kelamin`                    | `gender`                  | Direct copy                                 |
+| `email`                            | `email`                   | Truncated to 100 chars                      |
+| `no_telepon`                       | `telepon`                 | Direct copy                                 |
+| `alamat`                           | `alamat_lengkap`          | Direct copy                                 |
+| `kota`                             | `kota`                    | Direct copy                                 |
+| `provinsi`                         | `provinsi`                | Direct copy                                 |
+| `kode_pos`                         | `kode_pos`                | Direct copy                                 |
+| `golongan_darah`                   | `golongan_darah`          | Direct copy                                 |
+| `kontak_darurat`                   | `nama_kontak_darurat`     | Direct copy                                 |
+| `no_kontak_darurat`                | `telepon_kontak_darurat`  | Direct copy                                 |
+| `tanggal_registrasi`               | `tanggal_registrasi`      | Direct copy                                 |
 
 ---
 
