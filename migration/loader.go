@@ -49,6 +49,9 @@ func (l *Loader) LoadBatch(
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	// inserted/skipped track how many rows were new vs already existed in target.
+	var inserted, skipped int64
+
 	if !dryRun {
 		// Step 1: temp table — same structure as target, no constraints, auto-dropped at commit.
 		if _, err := tx.Exec(ctx, `
@@ -62,32 +65,26 @@ func (l *Loader) LoadBatch(
 			return err
 		}
 
-		// Step 3: upsert from temp into real table.
-		if _, err := tx.Exec(ctx, `
-			INSERT INTO pasien
-				(pasien_uuid, nama_lengkap, tanggal_lahir, gender, email, telepon,
-				 alamat_lengkap, kota, provinsi, kode_pos, golongan_darah,
-				 nama_kontak_darurat, telepon_kontak_darurat, tanggal_registrasi)
-			SELECT pasien_uuid, nama_lengkap, tanggal_lahir, gender, email, telepon,
-			       alamat_lengkap, kota, provinsi, kode_pos, golongan_darah,
-			       nama_kontak_darurat, telepon_kontak_darurat, tanggal_registrasi
-			FROM _tmp_pasien
-			ON CONFLICT (pasien_uuid) DO UPDATE SET
-				nama_lengkap           = EXCLUDED.nama_lengkap,
-				tanggal_lahir          = EXCLUDED.tanggal_lahir,
-				gender                 = EXCLUDED.gender,
-				email                  = EXCLUDED.email,
-				telepon                = EXCLUDED.telepon,
-				alamat_lengkap         = EXCLUDED.alamat_lengkap,
-				kota                   = EXCLUDED.kota,
-				provinsi               = EXCLUDED.provinsi,
-				kode_pos               = EXCLUDED.kode_pos,
-				golongan_darah         = EXCLUDED.golongan_darah,
-				nama_kontak_darurat    = EXCLUDED.nama_kontak_darurat,
-				telepon_kontak_darurat = EXCLUDED.telepon_kontak_darurat,
-				tanggal_registrasi     = EXCLUDED.tanggal_registrasi`); err != nil {
+		// Step 3: insert new rows only — skip existing (idempotent re-run safe).
+		// CTE returns count of actually inserted rows; skipped = batch_size - inserted.
+		if err := tx.QueryRow(ctx, `
+			WITH ins AS (
+				INSERT INTO pasien
+					(pasien_uuid, nama_lengkap, tanggal_lahir, gender, email, telepon,
+					 alamat_lengkap, kota, provinsi, kode_pos, golongan_darah,
+					 nama_kontak_darurat, telepon_kontak_darurat, tanggal_registrasi)
+				SELECT pasien_uuid, nama_lengkap, tanggal_lahir, gender, email, telepon,
+				       alamat_lengkap, kota, provinsi, kode_pos, golongan_darah,
+				       nama_kontak_darurat, telepon_kontak_darurat, tanggal_registrasi
+				FROM _tmp_pasien
+				ON CONFLICT (pasien_uuid) DO NOTHING
+				RETURNING 1
+			)
+			SELECT COUNT(*) FROM ins`,
+		).Scan(&inserted); err != nil {
 			return fmt.Errorf("upsert pasien: %w", err)
 		}
+		skipped = int64(len(rows)) - inserted
 
 		// Step 4: insert ID mapping entries (idempotent — ON CONFLICT DO NOTHING).
 		mapEntries := make([]model.IDMapEntry, len(srcRows))
@@ -102,13 +99,16 @@ func (l *Loader) LoadBatch(
 		if err := l.mapping.BulkInsert(ctx, tx, mapEntries); err != nil {
 			return err
 		}
+	} else {
+		// dry-run: count all as "inserted" for progress visibility, nothing actually written.
+		inserted = int64(len(rows))
 	}
 
-	// Step 5: update checkpoint + counters (always, even in dry-run, so progress is visible).
+	// Step 5: update checkpoint + counters atomically within the transaction.
 	firstID := int64(srcRows[0].IDPasien)
 	lastID := int64(srcRows[len(srcRows)-1].IDPasien)
 	if err := jobRepo.UpdateProgress(ctx, jobID,
-		int64(len(rows)), int64(len(rows)), 0,
+		int64(len(rows)), inserted, 0, skipped,
 		lastID, firstID,
 	); err != nil {
 		return err

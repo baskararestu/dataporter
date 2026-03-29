@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS migration.migration_jobs (
     batch_delay_ms     INT          NOT NULL DEFAULT 0,  -- backpressure: ms delay between batches
     dry_run            BOOLEAN      NOT NULL DEFAULT false,
     error_log          JSONB        DEFAULT '[]'::jsonb,
+    skipped            BIGINT       DEFAULT 0,    -- rows already existed in target (DO NOTHING)
     started_at         TIMESTAMPTZ,
     completed_at       TIMESTAMPTZ,
     rolled_back_at     TIMESTAMPTZ,
@@ -62,10 +63,11 @@ CREATE TABLE IF NOT EXISTS migration.migration_jobs (
     updated_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
--- Deduplication: prevent concurrent migration for same source+target
+-- Deduplication: prevent concurrent or duplicate migration for same source+target.
+-- 'completed' is included so a finished job blocks a new one (use rollback first to re-run).
 CREATE UNIQUE INDEX IF NOT EXISTS idx_migration_jobs_active_unique
     ON migration.migration_jobs (source_table, target_table)
-    WHERE status IN ('pending', 'running');
+    WHERE status IN ('pending', 'running', 'completed');
 
 CREATE INDEX IF NOT EXISTS idx_migration_jobs_status ON migration.migration_jobs (status);
 CREATE INDEX IF NOT EXISTS idx_migration_jobs_source ON migration.migration_jobs (source_table);

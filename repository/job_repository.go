@@ -30,7 +30,7 @@ func (r *JobRepository) Create(ctx context.Context, req model.CreateJobRequest) 
 			(source_table, target_table, batch_size, batch_delay_ms, dry_run)
 		VALUES ($1, $2, $3, $4, $5)
 		RETURNING job_id, source_table, target_table, status,
-		          total_records, processed, success, failed,
+		          total_records, processed, success, failed, skipped,
 		          last_processed_id, first_processed_id,
 		          batch_size, batch_delay_ms, dry_run, error_log,
 		          started_at, completed_at, rolled_back_at, created_at, updated_at`
@@ -46,7 +46,7 @@ func (r *JobRepository) Create(ctx context.Context, req model.CreateJobRequest) 
 func (r *JobRepository) GetByID(ctx context.Context, jobID uuid.UUID) (*model.MigrationJob, error) {
 	const q = `
 		SELECT job_id, source_table, target_table, status,
-		       total_records, processed, success, failed,
+		       total_records, processed, success, failed, skipped,
 		       last_processed_id, first_processed_id,
 		       batch_size, batch_delay_ms, dry_run, error_log,
 		       started_at, completed_at, rolled_back_at, created_at, updated_at
@@ -66,7 +66,7 @@ func (r *JobRepository) List(ctx context.Context, status string) ([]*model.Migra
 	)
 	if status != "" {
 		q = `SELECT job_id, source_table, target_table, status,
-		            total_records, processed, success, failed,
+		            total_records, processed, success, failed, skipped,
 		            last_processed_id, first_processed_id,
 		            batch_size, batch_delay_ms, dry_run, error_log,
 		            started_at, completed_at, rolled_back_at, created_at, updated_at
@@ -76,7 +76,7 @@ func (r *JobRepository) List(ctx context.Context, status string) ([]*model.Migra
 		args = []any{status}
 	} else {
 		q = `SELECT job_id, source_table, target_table, status,
-		            total_records, processed, success, failed,
+		            total_records, processed, success, failed, skipped,
 		            last_processed_id, first_processed_id,
 		            batch_size, batch_delay_ms, dry_run, error_log,
 		            started_at, completed_at, rolled_back_at, created_at, updated_at
@@ -131,17 +131,18 @@ func (r *JobRepository) UpdateStatus(ctx context.Context, jobID uuid.UUID, statu
 
 // UpdateProgress atomically updates checkpoint and counters for a batch.
 // Called within the same transaction as the data upsert for atomicity.
-func (r *JobRepository) UpdateProgress(ctx context.Context, jobID uuid.UUID, processed, success, failed, lastID, firstID int64) error {
+func (r *JobRepository) UpdateProgress(ctx context.Context, jobID uuid.UUID, processed, success, failed, skipped, lastID, firstID int64) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE migration.migration_jobs SET
 			processed          = processed + $1,
 			success            = success   + $2,
 			failed             = failed    + $3,
-			last_processed_id  = $4,
-			first_processed_id = CASE WHEN first_processed_id = 0 THEN $5 ELSE first_processed_id END,
+			skipped            = skipped   + $4,
+			last_processed_id  = $5,
+			first_processed_id = CASE WHEN first_processed_id = 0 THEN $6 ELSE first_processed_id END,
 			updated_at         = NOW()
-		WHERE job_id = $6`,
-		processed, success, failed, lastID, firstID, jobID,
+		WHERE job_id = $7`,
+		processed, success, failed, skipped, lastID, firstID, jobID,
 	)
 	if err != nil {
 		return fmt.Errorf("update job progress: %w", err)
@@ -184,7 +185,7 @@ func scanJob(s scanner) (*model.MigrationJob, error) {
 	var j model.MigrationJob
 	err := s.Scan(
 		&j.JobID, &j.SourceTable, &j.TargetTable, &j.Status,
-		&j.TotalRecords, &j.Processed, &j.Success, &j.Failed,
+		&j.TotalRecords, &j.Processed, &j.Success, &j.Failed, &j.Skipped,
 		&j.LastProcessedID, &j.FirstProcessedID,
 		&j.BatchSize, &j.BatchDelayMs, &j.DryRun, &j.ErrorLog,
 		&j.StartedAt, &j.CompletedAt, &j.RolledBackAt, &j.CreatedAt, &j.UpdatedAt,
