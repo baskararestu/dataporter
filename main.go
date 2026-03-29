@@ -32,7 +32,8 @@ var simrsDDL string
 // @description     REST API for migrating patient records from EMR PostgreSQL to SIMRS with schema transformation.
 // @contact.name    Baskara Restu
 // @license.name    MIT
-// @host            localhost:8080
+// @host            dtp-api.baskararw.my.id
+// @schemes         https
 // @BasePath        /
 func main() {
 	// Load .env if present (local dev). In production, env vars are injected directly.

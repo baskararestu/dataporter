@@ -132,7 +132,7 @@ definitions:
         example: starting
         type: string
     type: object
-host: localhost:8080
+host: dtp-api.baskararw.my.id
 info:
   contact:
     name: Baskara Restu
@@ -417,4 +417,6 @@ paths:
       summary: Health check
       tags:
       - metadata
+schemes:
+- https
 swagger: "2.0"

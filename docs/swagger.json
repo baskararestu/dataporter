@@ -1,4 +1,7 @@
 {
+    "schemes": [
+        "https"
+    ],
     "swagger": "2.0",
     "info": {
         "description": "REST API for migrating patient records from EMR PostgreSQL to SIMRS with schema transformation.",
@@ -11,7 +14,7 @@
         },
         "version": "1.0"
     },
-    "host": "localhost:8080",
+    "host": "dtp-api.baskararw.my.id",
     "basePath": "/",
     "paths": {
         "/api/jobs": {
