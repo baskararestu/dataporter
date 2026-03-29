@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/baskararestu/dataporter/config"
@@ -14,7 +15,6 @@ import (
 	"github.com/baskararestu/dataporter/monitoring"
 	"github.com/baskararestu/dataporter/repository"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
 )
@@ -25,11 +25,14 @@ type Handler struct {
 	jobRepo     *repository.JobRepository
 	migrator    *migration.Migrator
 	tracker     *monitoring.Tracker
-	sourceConn  *pgx.Conn
+	sourcePool  *pgxpool.Pool
 	targetDB    *pgxpool.Pool
 	sourceDBCfg config.DBConfig
 	emrExtraSQL string
 	appEnv      string
+	// activeJobs stores context.CancelFunc per running job UUID.
+	// StopJob calls the cancel func to actually stop the goroutine.
+	activeJobs sync.Map // map[uuid.UUID]context.CancelFunc
 }
 
 // NewHandler creates a new API handler.
@@ -38,7 +41,7 @@ func NewHandler(
 	jobRepo *repository.JobRepository,
 	migrator *migration.Migrator,
 	tracker *monitoring.Tracker,
-	sourceConn *pgx.Conn,
+	sourcePool *pgxpool.Pool,
 	targetDB *pgxpool.Pool,
 	sourceDBCfg config.DBConfig,
 	emrExtraSQL string,
@@ -49,7 +52,7 @@ func NewHandler(
 		jobRepo:     jobRepo,
 		migrator:    migrator,
 		tracker:     tracker,
-		sourceConn:  sourceConn,
+		sourcePool:  sourcePool,
 		targetDB:    targetDB,
 		sourceDBCfg: sourceDBCfg,
 		emrExtraSQL: emrExtraSQL,
@@ -147,8 +150,19 @@ func (h *Handler) StartJob(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Info().Str("job_id", jobID.String()).Str("source", job.SourceTable).Str("target", job.TargetTable).
 		Str("current_status", string(job.Status)).Msg("starting migration job")
+
+	// Create a per-job context so StopJob can cancel this goroutine independently
+	// from the global app context. Derive from appCtx so SIGTERM still stops everything.
+	jobCtx, cancel := context.WithCancel(h.appCtx)
+	h.activeJobs.Store(jobID, cancel)
+
 	go func() {
-		if err := h.migrator.Run(h.appCtx, job); err != nil {
+		defer func() {
+			// Always clean up: release cancel func and drain tracker.
+			h.activeJobs.Delete(jobID)
+			cancel()
+		}()
+		if err := h.migrator.Run(jobCtx, job); err != nil {
 			log.Error().Str("job_id", jobID.String()).Err(err).Msg("migration goroutine error")
 		}
 	}()
@@ -182,11 +196,21 @@ func (h *Handler) StopJob(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusConflict, "job is not running")
 		return
 	}
-	if err := h.jobRepo.UpdateStatus(r.Context(), jobID, model.JobStatusPaused); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to stop job: "+err.Error())
-		return
+
+	// Cancel the goroutine via its per-job context.
+	if val, ok := h.activeJobs.Load(jobID); ok {
+		val.(context.CancelFunc)()
+		log.Info().Str("job_id", jobID.String()).Msg("job stop signal sent")
+	} else {
+		// Goroutine not found in memory — service may have restarted.
+		// Fall back to direct DB status update so job is not stuck as 'running'.
+		log.Warn().Str("job_id", jobID.String()).Msg("no active goroutine found, updating DB status directly")
+		if err := h.jobRepo.UpdateStatus(r.Context(), jobID, model.JobStatusPaused); err != nil {
+			jsonError(w, http.StatusInternalServerError, "failed to stop job: "+err.Error())
+			return
+		}
 	}
-	jsonOK(w, http.StatusOK, "job paused", map[string]string{"job_id": jobID.String(), "status": "paused"})
+	jsonOK(w, http.StatusOK, "job stop signal sent", map[string]string{"job_id": jobID.String(), "status": "pausing"})
 }
 
 // RollbackJob deletes all migrated data for the job and marks it rolled_back.
@@ -305,7 +329,7 @@ func (h *Handler) ValidateJob(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusConflict, "job has not processed any rows yet")
 		return
 	}
-	validator := migration.NewValidator(h.sourceConn, h.targetDB)
+	validator := migration.NewValidator(h.sourcePool, h.targetDB)
 	result, err := validator.Verify(r.Context(), jobID, job.SourceTable,
 		job.FirstProcessedID, job.LastProcessedID,
 		job.Success, job.Skipped)

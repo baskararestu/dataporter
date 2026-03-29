@@ -6,27 +6,41 @@ import (
 
 	"github.com/baskararestu/dataporter/model"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Extractor reads batches of EMR pasien rows using a server-side cursor.
 // The cursor runs inside a REPEATABLE READ transaction to guarantee a consistent
 // snapshot even if the source DB is still serving production traffic.
+//
+// NewExtractor acquires a dedicated connection from the pool for the lifetime of the
+// cursor — server-side cursors are connection-scoped and cannot be shared.
 type Extractor struct {
+	conn       *pgxpool.Conn // dedicated connection, released on Close
 	tx         pgx.Tx
 	cursorName string
 	batchSize  int
 	done       bool
 }
 
-// NewExtractor opens a REPEATABLE READ transaction on the source connection and
-// declares a cursor starting after lastProcessedID (for checkpoint resume).
+// NewExtractor acquires a dedicated connection from the source pool, opens a REPEATABLE READ
+// transaction, and declares a cursor starting after lastProcessedID (for checkpoint resume).
 // Also returns the total row count within the same snapshot to avoid TOCTOU mismatch.
-func NewExtractor(ctx context.Context, conn *pgx.Conn, lastProcessedID int64, batchSize int) (*Extractor, int64, error) {
+//
+// The caller MUST call Close() to release the connection back to the pool.
+func NewExtractor(ctx context.Context, pool *pgxpool.Pool, lastProcessedID int64, batchSize int) (*Extractor, int64, error) {
+	// Acquire a dedicated connection — cursors are connection-scoped.
+	conn, err := pool.Acquire(ctx)
+	if err != nil {
+		return nil, 0, fmt.Errorf("acquire source conn: %w", err)
+	}
+
 	tx, err := conn.BeginTx(ctx, pgx.TxOptions{
 		IsoLevel:   pgx.RepeatableRead,
 		AccessMode: pgx.ReadOnly,
 	})
 	if err != nil {
+		conn.Release()
 		return nil, 0, fmt.Errorf("begin source tx: %w", err)
 	}
 
@@ -36,6 +50,7 @@ func NewExtractor(ctx context.Context, conn *pgx.Conn, lastProcessedID int64, ba
 		`SELECT COUNT(id_pasien) FROM pasien WHERE id_pasien > $1`, lastProcessedID,
 	).Scan(&total); err != nil {
 		_ = tx.Rollback(ctx)
+		conn.Release()
 		return nil, 0, fmt.Errorf("count total: %w", err)
 	}
 
@@ -52,10 +67,12 @@ func NewExtractor(ctx context.Context, conn *pgx.Conn, lastProcessedID int64, ba
 	))
 	if err != nil {
 		_ = tx.Rollback(ctx)
+		conn.Release()
 		return nil, 0, fmt.Errorf("declare cursor: %w", err)
 	}
 
 	return &Extractor{
+		conn:       conn,
 		tx:         tx,
 		cursorName: cursorName,
 		batchSize:  batchSize,
@@ -97,8 +114,10 @@ func (e *Extractor) FetchBatch(ctx context.Context) ([]model.EMRPasien, error) {
 	return batch, nil
 }
 
-// Close commits the source transaction (closes the cursor) and releases the connection.
+// Close commits the source transaction (closes the cursor) and releases the dedicated
+// connection back to the pool.
 func (e *Extractor) Close(ctx context.Context) error {
+	defer e.conn.Release()
 	if err := e.tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit source tx: %w", err)
 	}

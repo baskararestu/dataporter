@@ -4,23 +4,22 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
 )
 
 // Connections holds both DB connections needed by the application.
 type Connections struct {
-	// Source is a single read-only connection to the EMR database.
-	Source *pgx.Conn
-	// Target is a connection pool to the SIMRS (write) database.
+	// Source is a connection pool to the EMR database (read-only queries + cursor connections).
+	Source *pgxpool.Pool
+	// Target is a connection pool to the SIMRS (read-write) database.
 	Target *pgxpool.Pool
 }
 
-// Connect opens the source connection and target pool.
+// Connect opens both source and target connection pools.
 // The caller is responsible for calling Close when done.
 func Connect(ctx context.Context, sourceDSN, targetDSN string) (*Connections, error) {
-	src, err := pgx.Connect(ctx, sourceDSN)
+	src, err := pgxpool.New(ctx, sourceDSN)
 	if err != nil {
 		return nil, fmt.Errorf("connect source DB: %w", err)
 	}
@@ -28,7 +27,7 @@ func Connect(ctx context.Context, sourceDSN, targetDSN string) (*Connections, er
 
 	pool, err := pgxpool.New(ctx, targetDSN)
 	if err != nil {
-		src.Close(ctx)
+		src.Close()
 		return nil, fmt.Errorf("connect target DB: %w", err)
 	}
 	log.Info().Msg("target DB connected")
@@ -36,8 +35,8 @@ func Connect(ctx context.Context, sourceDSN, targetDSN string) (*Connections, er
 	return &Connections{Source: src, Target: pool}, nil
 }
 
-// Close releases both connections.
-func (c *Connections) Close(ctx context.Context) {
-	c.Source.Close(ctx)
+// Close releases both connection pools.
+func (c *Connections) Close(_ context.Context) {
+	c.Source.Close()
 	c.Target.Close()
 }

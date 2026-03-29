@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -21,13 +20,13 @@ type VerifyResult struct {
 
 // Validator compares row counts between source and target for a given job range.
 type Validator struct {
-	sourceConn *pgx.Conn
+	sourcePool *pgxpool.Pool
 	targetDB   *pgxpool.Pool
 }
 
 // NewValidator creates a Validator that queries both databases.
-func NewValidator(sourceConn *pgx.Conn, targetDB *pgxpool.Pool) *Validator {
-	return &Validator{sourceConn: sourceConn, targetDB: targetDB}
+func NewValidator(sourcePool *pgxpool.Pool, targetDB *pgxpool.Pool) *Validator {
+	return &Validator{sourcePool: sourcePool, targetDB: targetDB}
 }
 
 // Verify counts rows in source and target using 2 simple COUNT queries.
@@ -38,7 +37,7 @@ func NewValidator(sourceConn *pgx.Conn, targetDB *pgxpool.Pool) *Validator {
 // This is O(1) in round-trips regardless of how many rows were migrated.
 func (v *Validator) Verify(ctx context.Context, jobID uuid.UUID, sourceTable string, firstID, lastID, jobSuccess, jobSkipped int64) (*VerifyResult, error) {
 	var sourceCount int64
-	err := v.sourceConn.QueryRow(ctx,
+	err := v.sourcePool.QueryRow(ctx,
 		`SELECT COUNT(id_pasien) FROM pasien WHERE id_pasien BETWEEN $1 AND $2`,
 		firstID, lastID,
 	).Scan(&sourceCount)

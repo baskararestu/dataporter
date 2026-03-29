@@ -10,14 +10,13 @@ import (
 	"github.com/baskararestu/dataporter/monitoring"
 	"github.com/baskararestu/dataporter/repository"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
 )
 
 // Migrator orchestrates the full ETL loop for a single migration job.
 type Migrator struct {
-	sourceConn *pgx.Conn
+	sourcePool *pgxpool.Pool
 	targetDB   *pgxpool.Pool
 	jobRepo    *repository.JobRepository
 	loader     *Loader
@@ -27,15 +26,15 @@ type Migrator struct {
 
 // NewMigrator wires up all ETL components.
 func NewMigrator(
-	sourceConn *pgx.Conn,
+	sourcePool *pgxpool.Pool,
 	targetDB *pgxpool.Pool,
 	jobRepo *repository.JobRepository,
 	tracker *monitoring.Tracker,
 ) *Migrator {
 	loader := NewLoader(targetDB)
-	validator := NewValidator(sourceConn, targetDB)
+	validator := NewValidator(sourcePool, targetDB)
 	return &Migrator{
-		sourceConn: sourceConn,
+		sourcePool: sourcePool,
 		targetDB:   targetDB,
 		jobRepo:    jobRepo,
 		loader:     loader,
@@ -63,7 +62,8 @@ func (m *Migrator) Run(ctx context.Context, job *model.MigrationJob) error {
 
 	// Open server-side cursor on source DB (REPEATABLE READ snapshot).
 	// CountTotal runs inside the same transaction — count and cursor see identical data.
-	extractor, total, err := NewExtractor(ctx, m.sourceConn, job.LastProcessedID, job.BatchSize)
+	// NewExtractor acquires a dedicated conn from the pool; Close() releases it.
+	extractor, total, err := NewExtractor(ctx, m.sourcePool, job.LastProcessedID, job.BatchSize)
 	if err != nil {
 		return err
 	}
