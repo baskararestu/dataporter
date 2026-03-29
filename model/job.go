@@ -53,16 +53,6 @@ type CreateJobRequest struct {
 	DryRun       bool   `json:"dry_run"       example:"false"`
 }
 
-// IDMapEntry represents one row in migration.emr_simrs_id_map.
-// Persists the source INT id ↔ target UUID relationship as an audit trail.
-type IDMapEntry struct {
-	SourceID    int64     `db:"source_id"    json:"source_id"`
-	TargetUUID  uuid.UUID `db:"target_uuid"  json:"target_uuid"`
-	SourceTable string    `db:"source_table" json:"source_table"`
-	JobID       uuid.UUID `db:"job_id"       json:"job_id"`
-	CreatedAt   time.Time `db:"created_at"   json:"created_at"`
-}
-
 // ErrorResponse is the standard error envelope returned on failures.
 type ErrorResponse struct {
 	Error   string `json:"error"   example:"invalid_request"`

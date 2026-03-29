@@ -3,7 +3,9 @@ package migration
 import (
 	"context"
 	"fmt"
+	"strconv"
 
+	"github.com/baskararestu/dataporter/model"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -31,8 +33,8 @@ func NewValidator(sourceConn *pgx.Conn, targetDB *pgxpool.Pool) *Validator {
 }
 
 // Validate counts rows in source and target and returns a comparison result.
-// The source count only includes rows that were in scope for this job
-// (i.e. id_pasien > first_processed_id - 1, bounded by last_processed_id).
+// Compares source rows in the job's ID range against actual rows in public.pasien
+// by recomputing deterministic UUID v5 in batches.
 func (v *Validator) Validate(ctx context.Context, jobID uuid.UUID, sourceTable string, firstID, lastID int64) (*ValidationResult, error) {
 	var sourceCount int64
 	err := v.sourceConn.QueryRow(ctx,
@@ -43,13 +45,30 @@ func (v *Validator) Validate(ctx context.Context, jobID uuid.UUID, sourceTable s
 		return nil, fmt.Errorf("count source rows: %w", err)
 	}
 
+	// Count target rows by checking existence of deterministic UUID v5 in batches.
+	const batchSize = 5000
 	var targetCount int64
-	err = v.targetDB.QueryRow(ctx,
-		`SELECT COUNT(*) FROM migration.emr_simrs_id_map WHERE job_id = $1 AND source_table = $2`,
-		jobID, sourceTable,
-	).Scan(&targetCount)
-	if err != nil {
-		return nil, fmt.Errorf("count target rows via id map: %w", err)
+
+	for start := firstID; start <= lastID; start += batchSize {
+		end := start + batchSize - 1
+		if end > lastID {
+			end = lastID
+		}
+
+		uuids := make([]uuid.UUID, 0, end-start+1)
+		for id := start; id <= end; id++ {
+			uuids = append(uuids, uuid.NewSHA1(model.UUIDNamespace, []byte(strconv.FormatInt(id, 10))))
+		}
+
+		var batchCount int64
+		err = v.targetDB.QueryRow(ctx,
+			`SELECT COUNT(*) FROM public.pasien WHERE pasien_uuid = ANY($1)`,
+			uuids,
+		).Scan(&batchCount)
+		if err != nil {
+			return nil, fmt.Errorf("count target rows batch: %w", err)
+		}
+		targetCount += batchCount
 	}
 
 	missing := sourceCount - targetCount

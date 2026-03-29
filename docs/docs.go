@@ -581,6 +581,9 @@ const docTemplate = `{
                 "rolled_back_at": {
                     "type": "string"
                 },
+                "skipped": {
+                    "type": "integer"
+                },
                 "source_table": {
                     "type": "string"
                 },

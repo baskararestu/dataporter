@@ -12,15 +12,14 @@ import (
 )
 
 // Loader writes a transformed batch into the SIMRS target database.
-// It uses COPY → temp table → upsert to maximise throughput while staying idempotent.
+// It uses COPY → temp table → INSERT DO NOTHING to maximise throughput while staying idempotent.
 type Loader struct {
-	db      *pgxpool.Pool
-	mapping *repository.MappingRepository
+	db *pgxpool.Pool
 }
 
 // NewLoader creates a Loader backed by the given target DB pool.
-func NewLoader(db *pgxpool.Pool, mapping *repository.MappingRepository) *Loader {
-	return &Loader{db: db, mapping: mapping}
+func NewLoader(db *pgxpool.Pool) *Loader {
+	return &Loader{db: db}
 }
 
 // LoadBatch writes rows to the target in a single transaction:
@@ -85,20 +84,6 @@ func (l *Loader) LoadBatch(
 			return fmt.Errorf("upsert pasien: %w", err)
 		}
 		skipped = int64(len(rows)) - inserted
-
-		// Step 4: insert ID mapping entries (idempotent — ON CONFLICT DO NOTHING).
-		mapEntries := make([]model.IDMapEntry, len(srcRows))
-		for i, src := range srcRows {
-			mapEntries[i] = model.IDMapEntry{
-				SourceID:    int64(src.IDPasien),
-				TargetUUID:  rows[i].PasienUUID,
-				SourceTable: "pasien",
-				JobID:       jobID,
-			}
-		}
-		if err := l.mapping.BulkInsert(ctx, tx, mapEntries); err != nil {
-			return err
-		}
 	} else {
 		// dry-run: count all as "inserted" for progress visibility, nothing actually written.
 		inserted = int64(len(rows))

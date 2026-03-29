@@ -19,33 +19,30 @@ import (
 
 // Handler holds all HTTP handler dependencies.
 type Handler struct {
-	appCtx      context.Context
-	jobRepo     *repository.JobRepository
-	mappingRepo *repository.MappingRepository
-	migrator    *migration.Migrator
-	tracker     *monitoring.Tracker
-	sourceConn  *pgx.Conn
-	targetDB    *pgxpool.Pool
+	appCtx     context.Context
+	jobRepo    *repository.JobRepository
+	migrator   *migration.Migrator
+	tracker    *monitoring.Tracker
+	sourceConn *pgx.Conn
+	targetDB   *pgxpool.Pool
 }
 
 // NewHandler creates a new API handler.
 func NewHandler(
 	appCtx context.Context,
 	jobRepo *repository.JobRepository,
-	mappingRepo *repository.MappingRepository,
 	migrator *migration.Migrator,
 	tracker *monitoring.Tracker,
 	sourceConn *pgx.Conn,
 	targetDB *pgxpool.Pool,
 ) *Handler {
 	return &Handler{
-		appCtx:      appCtx,
-		jobRepo:     jobRepo,
-		mappingRepo: mappingRepo,
-		migrator:    migrator,
-		tracker:     tracker,
-		sourceConn:  sourceConn,
-		targetDB:    targetDB,
+		appCtx:     appCtx,
+		jobRepo:    jobRepo,
+		migrator:   migrator,
+		tracker:    tracker,
+		sourceConn: sourceConn,
+		targetDB:   targetDB,
 	}
 }
 

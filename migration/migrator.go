@@ -30,10 +30,9 @@ func NewMigrator(
 	sourceConn *pgx.Conn,
 	targetDB *pgxpool.Pool,
 	jobRepo *repository.JobRepository,
-	mappingRepo *repository.MappingRepository,
 	tracker *monitoring.Tracker,
 ) *Migrator {
-	loader := NewLoader(targetDB, mappingRepo)
+	loader := NewLoader(targetDB)
 	validator := NewValidator(sourceConn, targetDB)
 	return &Migrator{
 		sourceConn: sourceConn,
@@ -153,7 +152,7 @@ func (m *Migrator) Run(ctx context.Context, job *model.MigrationJob) error {
 }
 
 // Rollback deletes all data migrated by the given job from the target database.
-// Uses mapping table to find UUIDs, then deletes in batches to avoid long locks.
+// Recomputes deterministic UUID v5 from the source ID range and deletes in batches.
 func (m *Migrator) Rollback(ctx context.Context, jobID uuid.UUID) error {
 	job, err := m.jobRepo.GetByID(ctx, jobID)
 	if err != nil {
@@ -165,35 +164,38 @@ func (m *Migrator) Rollback(ctx context.Context, jobID uuid.UUID) error {
 	if job.Status == model.JobStatusRolledBack {
 		return fmt.Errorf("job already rolled back")
 	}
+	if job.FirstProcessedID == 0 || job.LastProcessedID == 0 {
+		return fmt.Errorf("job has no processed range to rollback")
+	}
 
-	log.Info().Str("job_id", jobID.String()).Msg("rollback started")
+	log.Info().Str("job_id", jobID.String()).
+		Int64("first_id", job.FirstProcessedID).Int64("last_id", job.LastProcessedID).
+		Msg("rollback started")
 
-	// Delete migrated pasien rows using UUID ranges derived from the mapping table.
-	const batchSQL = `
-		DELETE FROM public.pasien
-		WHERE pasien_uuid IN (
-			SELECT target_uuid FROM migration.emr_simrs_id_map
-			WHERE job_id = $1 AND source_table = $2
-			LIMIT 5000
-		)`
-
+	// Delete in batches of 5000 source IDs, recomputing UUID v5 for each.
+	const batchSize = 5000
 	deleted := int64(0)
-	for {
-		tag, err := m.targetDB.Exec(ctx, batchSQL, jobID, job.SourceTable)
+
+	for start := job.FirstProcessedID; start <= job.LastProcessedID; start += batchSize {
+		end := start + batchSize - 1
+		if end > job.LastProcessedID {
+			end = job.LastProcessedID
+		}
+
+		// Build UUID list for this range.
+		uuids := make([]uuid.UUID, 0, end-start+1)
+		for id := start; id <= end; id++ {
+			uuids = append(uuids, uuid.NewSHA1(model.UUIDNamespace, []byte(strconv.FormatInt(id, 10))))
+		}
+
+		tag, err := m.targetDB.Exec(ctx,
+			`DELETE FROM public.pasien WHERE pasien_uuid = ANY($1)`,
+			uuids,
+		)
 		if err != nil {
 			return fmt.Errorf("rollback delete batch: %w", err)
 		}
-		n := tag.RowsAffected()
-		deleted += n
-		if n == 0 {
-			break
-		}
-	}
-
-	// Clean up mapping entries for this job.
-	mappingRepo := repository.NewMappingRepository(m.targetDB)
-	if _, err := mappingRepo.DeleteByJobID(ctx, jobID); err != nil {
-		return fmt.Errorf("delete mapping entries: %w", err)
+		deleted += tag.RowsAffected()
 	}
 
 	if err := m.jobRepo.UpdateStatus(ctx, jobID, model.JobStatusRolledBack); err != nil {
