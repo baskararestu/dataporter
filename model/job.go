@@ -21,25 +21,25 @@ const (
 // MigrationJob represents a single migration job stored in migration.migration_jobs.
 // One job = one source→target table migration run with its own checkpoint, progress, and audit trail.
 type MigrationJob struct {
-	JobID             uuid.UUID  `db:"job_id"`
-	SourceTable       string     `db:"source_table"`
-	TargetTable       string     `db:"target_table"`
-	Status            JobStatus  `db:"status"`
-	TotalRecords      int64      `db:"total_records"`
-	Processed         int64      `db:"processed"`
-	Success           int64      `db:"success"`
-	Failed            int64      `db:"failed"`
-	LastProcessedID   int64      `db:"last_processed_id"`
-	FirstProcessedID  int64      `db:"first_processed_id"`
-	BatchSize         int        `db:"batch_size"`
-	BatchDelayMs      int        `db:"batch_delay_ms"`
-	DryRun            bool       `db:"dry_run"`
-	ErrorLog          []byte     `db:"error_log"` // JSONB stored as raw bytes
-	StartedAt         *time.Time `db:"started_at"`
-	CompletedAt       *time.Time `db:"completed_at"`
-	RolledBackAt      *time.Time `db:"rolled_back_at"`
-	CreatedAt         time.Time  `db:"created_at"`
-	UpdatedAt         time.Time  `db:"updated_at"`
+	JobID            uuid.UUID  `db:"job_id"`
+	SourceTable      string     `db:"source_table"`
+	TargetTable      string     `db:"target_table"`
+	Status           JobStatus  `db:"status"`
+	TotalRecords     int64      `db:"total_records"`
+	Processed        int64      `db:"processed"`
+	Success          int64      `db:"success"`
+	Failed           int64      `db:"failed"`
+	LastProcessedID  int64      `db:"last_processed_id"`
+	FirstProcessedID int64      `db:"first_processed_id"`
+	BatchSize        int        `db:"batch_size"`
+	BatchDelayMs     int        `db:"batch_delay_ms"`
+	DryRun           bool       `db:"dry_run"`
+	ErrorLog         []byte     `db:"error_log"` // JSONB stored as raw bytes
+	StartedAt        *time.Time `db:"started_at"`
+	CompletedAt      *time.Time `db:"completed_at"`
+	RolledBackAt     *time.Time `db:"rolled_back_at"`
+	CreatedAt        time.Time  `db:"created_at"`
+	UpdatedAt        time.Time  `db:"updated_at"`
 }
 
 // CreateJobRequest holds the parameters for creating a new migration job via the API.
