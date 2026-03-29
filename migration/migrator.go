@@ -3,7 +3,6 @@ package migration
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/baskararestu/dataporter/model"
@@ -152,7 +151,8 @@ func (m *Migrator) Run(ctx context.Context, job *model.MigrationJob) error {
 }
 
 // Rollback deletes all data migrated by the given job from the target database.
-// Recomputes deterministic UUID v5 from the source ID range and deletes in batches.
+// Uses a single DELETE with generate_series + uuid_generate_v5 in the DB — no
+// UUID rebuilding in Go, no round-trip batches.
 func (m *Migrator) Rollback(ctx context.Context, jobID uuid.UUID) error {
 	job, err := m.jobRepo.GetByID(ctx, jobID)
 	if err != nil {
@@ -172,37 +172,25 @@ func (m *Migrator) Rollback(ctx context.Context, jobID uuid.UUID) error {
 		Int64("first_id", job.FirstProcessedID).Int64("last_id", job.LastProcessedID).
 		Msg("rollback started")
 
-	// Delete in batches of 5000 source IDs, recomputing UUID v5 for each.
-	const batchSize = 5000
-	deleted := int64(0)
-
-	for start := job.FirstProcessedID; start <= job.LastProcessedID; start += batchSize {
-		end := start + batchSize - 1
-		if end > job.LastProcessedID {
-			end = job.LastProcessedID
-		}
-
-		// Build UUID list for this range.
-		uuids := make([]uuid.UUID, 0, end-start+1)
-		for id := start; id <= end; id++ {
-			uuids = append(uuids, uuid.NewSHA1(model.UUIDNamespace, []byte(strconv.FormatInt(id, 10))))
-		}
-
-		tag, err := m.targetDB.Exec(ctx,
-			`DELETE FROM public.pasien WHERE pasien_uuid = ANY($1)`,
-			uuids,
-		)
-		if err != nil {
-			return fmt.Errorf("rollback delete batch: %w", err)
-		}
-		deleted += tag.RowsAffected()
+	// Single DELETE using generate_series + uuid_generate_v5 — entire range in one query,
+	// no UUID reconstruction in Go, no round-trip batches.
+	tag, err := m.targetDB.Exec(ctx, `
+		DELETE FROM public.pasien
+		WHERE pasien_uuid IN (
+			SELECT uuid_generate_v5($1::uuid, id::text)
+			FROM generate_series($2::bigint, $3::bigint) AS id
+		)`,
+		model.UUIDNamespace.String(), job.FirstProcessedID, job.LastProcessedID,
+	)
+	if err != nil {
+		return fmt.Errorf("rollback delete: %w", err)
 	}
 
 	if err := m.jobRepo.UpdateStatus(ctx, jobID, model.JobStatusRolledBack); err != nil {
 		return fmt.Errorf("set rolled_back: %w", err)
 	}
 
-	log.Info().Str("job_id", jobID.String()).Int64("deleted", deleted).Msg("rollback complete")
+	log.Info().Str("job_id", jobID.String()).Int64("deleted", tag.RowsAffected()).Msg("rollback complete")
 	return nil
 }
 
