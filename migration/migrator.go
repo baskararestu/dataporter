@@ -216,17 +216,18 @@ func (m *Migrator) failJob(ctx context.Context, jobID uuid.UUID, err error) erro
 }
 
 // filterTransformed returns only the source rows whose IDPasien did not appear in the error list.
+// Uses map[int]struct{} to avoid string allocations per row in the hot path.
 func filterTransformed(src []model.EMRPasien, errs []TransformError) []model.EMRPasien {
 	if len(errs) == 0 {
 		return src
 	}
-	failed := make(map[string]bool, len(errs))
+	failed := make(map[int]struct{}, len(errs))
 	for _, e := range errs {
-		failed[strconv.Itoa(e.IDPasien)] = true
+		failed[e.IDPasien] = struct{}{}
 	}
 	out := make([]model.EMRPasien, 0, len(src)-len(errs))
 	for _, r := range src {
-		if !failed[strconv.Itoa(r.IDPasien)] {
+		if _, skip := failed[r.IDPasien]; !skip {
 			out = append(out, r)
 		}
 	}
