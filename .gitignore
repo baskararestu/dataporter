@@ -1,0 +1,35 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/dataporter
+
+# Test binary
+*.test
+
+# Go coverage
+*.out
+coverage.html
+
+# Environment
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker volumes
+emr_data/
+simrs_data/
+
+# Temporary files
+tmp/

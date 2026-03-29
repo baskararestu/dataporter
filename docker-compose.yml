@@ -1,0 +1,67 @@
+services:
+  # ─── Local DB (development only) ──────────────────────
+  # Run with: docker compose --profile local up --build
+  # Do NOT use in production — use external DB directly
+
+  postgres_emr:
+    image: postgres:16-alpine
+    profiles: ["local"]
+    environment:
+      POSTGRES_DB: ${EMR_DB_NAME:-database_emr}
+      POSTGRES_USER: ${EMR_DB_USER:-emr_user}
+      POSTGRES_PASSWORD: ${EMR_DB_PASSWORD:-emr_pass}
+    ports:
+      - "${EMR_DB_PORT:-5433}:5432"
+    volumes:
+      - ./scripts/001_init_emr.sql:/docker-entrypoint-initdb.d/001_init.sql
+      - emr_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${EMR_DB_USER:-emr_user} -d ${EMR_DB_NAME:-database_emr}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgres_simrs:
+    image: postgres:16-alpine
+    profiles: ["local"]
+    environment:
+      POSTGRES_DB: ${SIMRS_DB_NAME:-database_simrs}
+      POSTGRES_USER: ${SIMRS_DB_USER:-simrs_user}
+      POSTGRES_PASSWORD: ${SIMRS_DB_PASSWORD:-simrs_pass}
+    ports:
+      - "${SIMRS_DB_PORT:-5434}:5432"
+    volumes:
+      - ./scripts/002_init_simrs.sql:/docker-entrypoint-initdb.d/001_init.sql
+      - simrs_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SIMRS_DB_USER:-simrs_user} -d ${SIMRS_DB_NAME:-database_simrs}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ─── Migration App ────────────────────────────────────
+  # Always runs. SOURCE_DSN and TARGET_DSN from .env
+  # Can point to local PG containers OR external VPS DB
+
+  migration:
+    build: .
+    environment:
+      SOURCE_DSN: ${SOURCE_DSN}
+      TARGET_DSN: ${TARGET_DSN}
+      BATCH_SIZE: ${BATCH_SIZE:-5000}
+      BATCH_DELAY_MS: ${BATCH_DELAY_MS:-0}
+      HTTP_PORT: ${HTTP_PORT:-8080}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "${HTTP_PORT:-8080}:${HTTP_PORT:-8080}"
+    depends_on:
+      postgres_emr:
+        condition: service_healthy
+        required: false
+      postgres_simrs:
+        condition: service_healthy
+        required: false
+
+volumes:
+  emr_data:
+  simrs_data:
