@@ -1,5 +1,15 @@
 basePath: /
 definitions:
+  model.APIResponse:
+    properties:
+      data: {}
+      message:
+        example: job created
+        type: string
+      success:
+        example: true
+        type: boolean
+    type: object
   model.CreateJobRequest:
     properties:
       batch_delay_ms:
@@ -16,120 +26,6 @@ definitions:
         type: string
       target_table:
         example: pasien
-        type: string
-    type: object
-  model.ErrorResponse:
-    properties:
-      error:
-        example: invalid_request
-        type: string
-      message:
-        example: source_table and target_table are required
-        type: string
-    type: object
-  model.HealthResponse:
-    properties:
-      status:
-        example: ok
-        type: string
-      time:
-        type: string
-    type: object
-  model.JobErrorsResponse:
-    properties:
-      errors:
-        items: {}
-        type: array
-      job_id:
-        type: string
-      total:
-        type: integer
-    type: object
-  model.JobStatus:
-    enum:
-    - pending
-    - running
-    - paused
-    - completed
-    - failed
-    - rolled_back
-    type: string
-    x-enum-varnames:
-    - JobStatusPending
-    - JobStatusRunning
-    - JobStatusPaused
-    - JobStatusCompleted
-    - JobStatusFailed
-    - JobStatusRolledBack
-  model.ListJobsResponse:
-    properties:
-      jobs:
-        items:
-          $ref: '#/definitions/model.MigrationJob'
-        type: array
-      total:
-        type: integer
-    type: object
-  model.ListTablesResponse:
-    properties:
-      supported:
-        items:
-          type: string
-        type: array
-    type: object
-  model.MigrationJob:
-    properties:
-      batch_delay_ms:
-        type: integer
-      batch_size:
-        type: integer
-      completed_at:
-        type: string
-      created_at:
-        type: string
-      dry_run:
-        type: boolean
-      error_log:
-        description: JSONB stored as raw bytes
-        items:
-          type: integer
-        type: array
-      failed:
-        type: integer
-      first_processed_id:
-        type: integer
-      job_id:
-        type: string
-      last_processed_id:
-        type: integer
-      processed:
-        type: integer
-      rolled_back_at:
-        type: string
-      skipped:
-        type: integer
-      source_table:
-        type: string
-      started_at:
-        type: string
-      status:
-        $ref: '#/definitions/model.JobStatus'
-      success:
-        type: integer
-      target_table:
-        type: string
-      total_records:
-        type: integer
-      updated_at:
-        type: string
-    type: object
-  model.StatusResponse:
-    properties:
-      job_id:
-        example: 550e8400-e29b-41d4-a716-446655440000
-        type: string
-      status:
-        example: starting
         type: string
     type: object
 host: dtp-api.baskararw.my.id
@@ -158,11 +54,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/model.ListJobsResponse'
+            $ref: '#/definitions/model.APIResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/model.ErrorResponse'
+            $ref: '#/definitions/model.APIResponse'
       summary: List migration jobs
       tags:
       - jobs
@@ -184,23 +80,23 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/model.MigrationJob'
+            $ref: '#/definitions/model.APIResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/model.ErrorResponse'
+            $ref: '#/definitions/model.APIResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/model.ErrorResponse'
+            $ref: '#/definitions/model.APIResponse'
         "422":
           description: Unprocessable Entity
           schema:
-            $ref: '#/definitions/model.ErrorResponse'
+            $ref: '#/definitions/model.APIResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/model.ErrorResponse'
+            $ref: '#/definitions/model.APIResponse'
       summary: Create migration job
       tags:
       - jobs
@@ -220,15 +116,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/model.MigrationJob'
+            $ref: '#/definitions/model.APIResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/model.ErrorResponse'
+            $ref: '#/definitions/model.APIResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/model.ErrorResponse'
+            $ref: '#/definitions/model.APIResponse'
       summary: Get migration job
       tags:
       - jobs
@@ -247,15 +143,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/model.JobErrorsResponse'
+            $ref: '#/definitions/model.APIResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/model.ErrorResponse'
+            $ref: '#/definitions/model.APIResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/model.ErrorResponse'
+            $ref: '#/definitions/model.APIResponse'
       summary: Get job errors
       tags:
       - jobs
@@ -275,19 +171,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/model.StatusResponse'
+            $ref: '#/definitions/model.APIResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/model.ErrorResponse'
+            $ref: '#/definitions/model.APIResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/model.ErrorResponse'
+            $ref: '#/definitions/model.APIResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/model.ErrorResponse'
+            $ref: '#/definitions/model.APIResponse'
       summary: Rollback migration job
       tags:
       - jobs
@@ -306,19 +202,19 @@ paths:
         "202":
           description: Accepted
           schema:
-            $ref: '#/definitions/model.StatusResponse'
+            $ref: '#/definitions/model.APIResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/model.ErrorResponse'
+            $ref: '#/definitions/model.APIResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/model.ErrorResponse'
+            $ref: '#/definitions/model.APIResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/model.ErrorResponse'
+            $ref: '#/definitions/model.APIResponse'
       summary: Start migration job
       tags:
       - jobs
@@ -338,23 +234,23 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/model.StatusResponse'
+            $ref: '#/definitions/model.APIResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/model.ErrorResponse'
+            $ref: '#/definitions/model.APIResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/model.ErrorResponse'
+            $ref: '#/definitions/model.APIResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/model.ErrorResponse'
+            $ref: '#/definitions/model.APIResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/model.ErrorResponse'
+            $ref: '#/definitions/model.APIResponse'
       summary: Stop (pause) migration job
       tags:
       - jobs
@@ -374,20 +270,19 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/model.APIResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/model.ErrorResponse'
+            $ref: '#/definitions/model.APIResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/model.ErrorResponse'
+            $ref: '#/definitions/model.APIResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/model.ErrorResponse'
+            $ref: '#/definitions/model.APIResponse'
       summary: Validate migration job
       tags:
       - jobs
@@ -400,7 +295,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/model.ListTablesResponse'
+            $ref: '#/definitions/model.APIResponse'
       summary: List supported tables
       tags:
       - metadata
@@ -413,7 +308,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/model.HealthResponse'
+            $ref: '#/definitions/model.APIResponse'
       summary: Health check
       tags:
       - metadata

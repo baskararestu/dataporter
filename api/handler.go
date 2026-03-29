@@ -54,24 +54,24 @@ func NewHandler(
 // @Accept       json
 // @Produce      json
 // @Param        body  body      model.CreateJobRequest  true  "Job parameters"
-// @Success      201   {object}  model.MigrationJob
-// @Failure      400   {object}  model.ErrorResponse
-// @Failure      409   {object}  model.ErrorResponse
-// @Failure      422   {object}  model.ErrorResponse
-// @Failure      500   {object}  model.ErrorResponse
+// @Success      201   {object}  model.APIResponse
+// @Failure      400   {object}  model.APIResponse
+// @Failure      409   {object}  model.APIResponse
+// @Failure      422   {object}  model.APIResponse
+// @Failure      500   {object}  model.APIResponse
 // @Router       /api/jobs [post]
 func (h *Handler) CreateJob(w http.ResponseWriter, r *http.Request) {
 	var req model.CreateJobRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		jsonError(w, http.StatusBadRequest, "invalid request: "+err.Error())
 		return
 	}
 	if req.SourceTable == "" || req.TargetTable == "" {
-		jsonError(w, http.StatusBadRequest, "invalid_request", "source_table and target_table are required")
+		jsonError(w, http.StatusBadRequest, "source_table and target_table are required")
 		return
 	}
 	if _, err := migration.LookupTable(req.SourceTable); err != nil {
-		jsonError(w, http.StatusUnprocessableEntity, "unsupported_table", err.Error())
+		jsonError(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
 	log.Info().Str("source_table", req.SourceTable).Str("target_table", req.TargetTable).
@@ -79,14 +79,14 @@ func (h *Handler) CreateJob(w http.ResponseWriter, r *http.Request) {
 	job, err := h.jobRepo.Create(r.Context(), req)
 	if err != nil {
 		if strings.Contains(err.Error(), "23505") {
-			jsonError(w, http.StatusConflict, "duplicate_job", "an active job for this source+target already exists")
+			jsonError(w, http.StatusConflict, "an active job for this source+target already exists")
 			return
 		}
-		jsonError(w, http.StatusInternalServerError, "create_failed", err.Error())
+		jsonError(w, http.StatusInternalServerError, "failed to create job: "+err.Error())
 		return
 	}
 	log.Info().Str("job_id", job.JobID.String()).Msg("migration job created")
-	jsonOK(w, http.StatusCreated, job)
+	jsonOK(w, http.StatusCreated, "job created", job)
 }
 
 // StartJob begins (or resumes) a migration job in a background goroutine.
@@ -96,10 +96,10 @@ func (h *Handler) CreateJob(w http.ResponseWriter, r *http.Request) {
 // @Tags         jobs
 // @Produce      json
 // @Param        job_id  path      string  true  "Job UUID"
-// @Success      202     {object}  model.StatusResponse
-// @Failure      400     {object}  model.ErrorResponse
-// @Failure      404     {object}  model.ErrorResponse
-// @Failure      409     {object}  model.ErrorResponse
+// @Success      202     {object}  model.APIResponse
+// @Failure      400     {object}  model.APIResponse
+// @Failure      404     {object}  model.APIResponse
+// @Failure      409     {object}  model.APIResponse
 // @Router       /api/jobs/{job_id}/start [post]
 func (h *Handler) StartJob(w http.ResponseWriter, r *http.Request) {
 	jobID, ok := parseJobID(w, r)
@@ -108,15 +108,15 @@ func (h *Handler) StartJob(w http.ResponseWriter, r *http.Request) {
 	}
 	job, err := h.jobRepo.GetByID(r.Context(), jobID)
 	if err != nil {
-		jsonError(w, http.StatusNotFound, "not_found", "job not found")
+		jsonError(w, http.StatusNotFound, "job not found")
 		return
 	}
 	if job.Status == model.JobStatusRunning {
-		jsonError(w, http.StatusConflict, "already_running", "job is already running")
+		jsonError(w, http.StatusConflict, "job is already running")
 		return
 	}
 	if job.Status == model.JobStatusCompleted || job.Status == model.JobStatusRolledBack {
-		jsonError(w, http.StatusConflict, "terminal_state", "job is in a terminal state and cannot be restarted")
+		jsonError(w, http.StatusConflict, "job is in a terminal state and cannot be restarted")
 		return
 	}
 	log.Info().Str("job_id", jobID.String()).Str("source", job.SourceTable).Str("target", job.TargetTable).
@@ -126,7 +126,7 @@ func (h *Handler) StartJob(w http.ResponseWriter, r *http.Request) {
 			log.Error().Str("job_id", jobID.String()).Err(err).Msg("migration goroutine error")
 		}
 	}()
-	jsonOK(w, http.StatusAccepted, map[string]string{"job_id": jobID.String(), "status": "starting"})
+	jsonOK(w, http.StatusAccepted, "job starting", map[string]string{"job_id": jobID.String(), "status": "starting"})
 }
 
 // StopJob signals the running job to pause.
@@ -136,11 +136,11 @@ func (h *Handler) StartJob(w http.ResponseWriter, r *http.Request) {
 // @Tags         jobs
 // @Produce      json
 // @Param        job_id  path      string  true  "Job UUID"
-// @Success      200     {object}  model.StatusResponse
-// @Failure      400     {object}  model.ErrorResponse
-// @Failure      404     {object}  model.ErrorResponse
-// @Failure      409     {object}  model.ErrorResponse
-// @Failure      500     {object}  model.ErrorResponse
+// @Success      200     {object}  model.APIResponse
+// @Failure      400     {object}  model.APIResponse
+// @Failure      404     {object}  model.APIResponse
+// @Failure      409     {object}  model.APIResponse
+// @Failure      500     {object}  model.APIResponse
 // @Router       /api/jobs/{job_id}/stop [post]
 func (h *Handler) StopJob(w http.ResponseWriter, r *http.Request) {
 	jobID, ok := parseJobID(w, r)
@@ -149,18 +149,18 @@ func (h *Handler) StopJob(w http.ResponseWriter, r *http.Request) {
 	}
 	job, err := h.jobRepo.GetByID(r.Context(), jobID)
 	if err != nil {
-		jsonError(w, http.StatusNotFound, "not_found", "job not found")
+		jsonError(w, http.StatusNotFound, "job not found")
 		return
 	}
 	if job.Status != model.JobStatusRunning {
-		jsonError(w, http.StatusConflict, "not_running", "job is not running")
+		jsonError(w, http.StatusConflict, "job is not running")
 		return
 	}
 	if err := h.jobRepo.UpdateStatus(r.Context(), jobID, model.JobStatusPaused); err != nil {
-		jsonError(w, http.StatusInternalServerError, "stop_failed", err.Error())
+		jsonError(w, http.StatusInternalServerError, "failed to stop job: "+err.Error())
 		return
 	}
-	jsonOK(w, http.StatusOK, map[string]string{"job_id": jobID.String(), "status": "paused"})
+	jsonOK(w, http.StatusOK, "job paused", map[string]string{"job_id": jobID.String(), "status": "paused"})
 }
 
 // RollbackJob deletes all migrated data for the job and marks it rolled_back.
@@ -170,10 +170,10 @@ func (h *Handler) StopJob(w http.ResponseWriter, r *http.Request) {
 // @Tags         jobs
 // @Produce      json
 // @Param        job_id  path      string  true  "Job UUID"
-// @Success      200     {object}  model.StatusResponse
-// @Failure      400     {object}  model.ErrorResponse
-// @Failure      409     {object}  model.ErrorResponse
-// @Failure      500     {object}  model.ErrorResponse
+// @Success      200     {object}  model.APIResponse
+// @Failure      400     {object}  model.APIResponse
+// @Failure      409     {object}  model.APIResponse
+// @Failure      500     {object}  model.APIResponse
 // @Router       /api/jobs/{job_id}/rollback [post]
 func (h *Handler) RollbackJob(w http.ResponseWriter, r *http.Request) {
 	jobID, ok := parseJobID(w, r)
@@ -182,13 +182,13 @@ func (h *Handler) RollbackJob(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := h.migrator.Rollback(r.Context(), jobID); err != nil {
 		if strings.Contains(err.Error(), "cannot rollback") || strings.Contains(err.Error(), "already rolled back") {
-			jsonError(w, http.StatusConflict, "rollback_conflict", err.Error())
+			jsonError(w, http.StatusConflict, err.Error())
 			return
 		}
-		jsonError(w, http.StatusInternalServerError, "rollback_failed", err.Error())
+		jsonError(w, http.StatusInternalServerError, "rollback failed: "+err.Error())
 		return
 	}
-	jsonOK(w, http.StatusOK, map[string]string{"job_id": jobID.String(), "status": "rolled_back"})
+	jsonOK(w, http.StatusOK, "job rolled back", map[string]string{"job_id": jobID.String(), "status": "rolled_back"})
 }
 
 // ListJobs returns all jobs, optionally filtered by ?status=.
@@ -198,17 +198,17 @@ func (h *Handler) RollbackJob(w http.ResponseWriter, r *http.Request) {
 // @Tags         jobs
 // @Produce      json
 // @Param        status  query     string  false  "Filter by status (pending, running, paused, completed, failed, rolled_back)"
-// @Success      200     {object}  model.ListJobsResponse
-// @Failure      500     {object}  model.ErrorResponse
+// @Success      200     {object}  model.APIResponse
+// @Failure      500     {object}  model.APIResponse
 // @Router       /api/jobs [get]
 func (h *Handler) ListJobs(w http.ResponseWriter, r *http.Request) {
 	status := r.URL.Query().Get("status")
 	jobs, err := h.jobRepo.List(r.Context(), status)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "list_failed", err.Error())
+		jsonError(w, http.StatusInternalServerError, "failed to list jobs: "+err.Error())
 		return
 	}
-	jsonOK(w, http.StatusOK, map[string]any{"jobs": jobs, "total": len(jobs)})
+	jsonOK(w, http.StatusOK, "ok", map[string]any{"jobs": jobs, "total": len(jobs)})
 }
 
 // GetJob returns full details and live progress for a single job.
@@ -218,9 +218,9 @@ func (h *Handler) ListJobs(w http.ResponseWriter, r *http.Request) {
 // @Tags         jobs
 // @Produce      json
 // @Param        job_id  path      string  true  "Job UUID"
-// @Success      200     {object}  model.MigrationJob
-// @Failure      400     {object}  model.ErrorResponse
-// @Failure      404     {object}  model.ErrorResponse
+// @Success      200     {object}  model.APIResponse
+// @Failure      400     {object}  model.APIResponse
+// @Failure      404     {object}  model.APIResponse
 // @Router       /api/jobs/{job_id} [get]
 func (h *Handler) GetJob(w http.ResponseWriter, r *http.Request) {
 	jobID, ok := parseJobID(w, r)
@@ -229,7 +229,7 @@ func (h *Handler) GetJob(w http.ResponseWriter, r *http.Request) {
 	}
 	job, err := h.jobRepo.GetByID(r.Context(), jobID)
 	if err != nil {
-		jsonError(w, http.StatusNotFound, "not_found", "job not found")
+		jsonError(w, http.StatusNotFound, "job not found")
 		return
 	}
 	processed, success, failed := h.tracker.Get(jobID)
@@ -249,7 +249,7 @@ func (h *Handler) GetJob(w http.ResponseWriter, r *http.Request) {
 		resp.LiveFailed = failed
 		resp.Percentage = float64(processed) / float64(total) * 100
 	}
-	jsonOK(w, http.StatusOK, resp)
+	jsonOK(w, http.StatusOK, "ok", resp)
 }
 
 // ValidateJob runs a post-migration count check for the job.
@@ -259,10 +259,10 @@ func (h *Handler) GetJob(w http.ResponseWriter, r *http.Request) {
 // @Tags         jobs
 // @Produce      json
 // @Param        job_id  path      string  true  "Job UUID"
-// @Success      200     {object}  map[string]any
-// @Failure      400     {object}  model.ErrorResponse
-// @Failure      404     {object}  model.ErrorResponse
-// @Failure      500     {object}  model.ErrorResponse
+// @Success      200     {object}  model.APIResponse
+// @Failure      400     {object}  model.APIResponse
+// @Failure      404     {object}  model.APIResponse
+// @Failure      500     {object}  model.APIResponse
 // @Router       /api/jobs/{job_id}/validate [get]
 func (h *Handler) ValidateJob(w http.ResponseWriter, r *http.Request) {
 	jobID, ok := parseJobID(w, r)
@@ -271,16 +271,16 @@ func (h *Handler) ValidateJob(w http.ResponseWriter, r *http.Request) {
 	}
 	job, err := h.jobRepo.GetByID(r.Context(), jobID)
 	if err != nil {
-		jsonError(w, http.StatusNotFound, "not_found", "job not found")
+		jsonError(w, http.StatusNotFound, "job not found")
 		return
 	}
 	validator := migration.NewValidator(h.sourceConn, h.targetDB)
 	result, err := validator.Validate(r.Context(), jobID, job.SourceTable, job.FirstProcessedID, job.LastProcessedID)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "validate_failed", err.Error())
+		jsonError(w, http.StatusInternalServerError, "validation failed: "+err.Error())
 		return
 	}
-	jsonOK(w, http.StatusOK, result)
+	jsonOK(w, http.StatusOK, "ok", result)
 }
 
 // GetJobErrors returns the error_log JSONB for a job as a parsed array.
@@ -290,9 +290,9 @@ func (h *Handler) ValidateJob(w http.ResponseWriter, r *http.Request) {
 // @Tags         jobs
 // @Produce      json
 // @Param        job_id  path      string  true  "Job UUID"
-// @Success      200     {object}  model.JobErrorsResponse
-// @Failure      400     {object}  model.ErrorResponse
-// @Failure      404     {object}  model.ErrorResponse
+// @Success      200     {object}  model.APIResponse
+// @Failure      400     {object}  model.APIResponse
+// @Failure      404     {object}  model.APIResponse
 // @Router       /api/jobs/{job_id}/errors [get]
 func (h *Handler) GetJobErrors(w http.ResponseWriter, r *http.Request) {
 	jobID, ok := parseJobID(w, r)
@@ -301,14 +301,14 @@ func (h *Handler) GetJobErrors(w http.ResponseWriter, r *http.Request) {
 	}
 	job, err := h.jobRepo.GetByID(r.Context(), jobID)
 	if err != nil {
-		jsonError(w, http.StatusNotFound, "not_found", "job not found")
+		jsonError(w, http.StatusNotFound, "job not found")
 		return
 	}
 	var errorLog []any
 	if len(job.ErrorLog) > 0 {
 		_ = json.Unmarshal(job.ErrorLog, &errorLog)
 	}
-	jsonOK(w, http.StatusOK, map[string]any{"job_id": jobID.String(), "errors": errorLog, "total": len(errorLog)})
+	jsonOK(w, http.StatusOK, "ok", map[string]any{"job_id": jobID.String(), "errors": errorLog, "total": len(errorLog)})
 }
 
 // ListTables returns all supported source->target migration pairs.
@@ -317,10 +317,10 @@ func (h *Handler) GetJobErrors(w http.ResponseWriter, r *http.Request) {
 // @Description  Returns all source→target table pairs that the migrator supports.
 // @Tags         metadata
 // @Produce      json
-// @Success      200  {object}  model.ListTablesResponse
+// @Success      200  {object}  model.APIResponse
 // @Router       /api/tables [get]
 func (h *Handler) ListTables(w http.ResponseWriter, _ *http.Request) {
-	jsonOK(w, http.StatusOK, map[string]any{"supported": migration.SupportedTables()})
+	jsonOK(w, http.StatusOK, "ok", map[string]any{"supported": migration.SupportedTables()})
 }
 
 // Healthz returns 200 if the service is alive.
@@ -329,30 +329,30 @@ func (h *Handler) ListTables(w http.ResponseWriter, _ *http.Request) {
 // @Description  Returns HTTP 200 with status ok if the service is up.
 // @Tags         metadata
 // @Produce      json
-// @Success      200  {object}  model.HealthResponse
+// @Success      200  {object}  model.APIResponse
 // @Router       /healthz [get]
 func (h *Handler) Healthz(w http.ResponseWriter, _ *http.Request) {
-	jsonOK(w, http.StatusOK, map[string]any{"status": "ok", "time": time.Now().UTC()})
+	jsonOK(w, http.StatusOK, "ok", map[string]any{"status": "ok", "time": time.Now().UTC()})
 }
 
 func parseJobID(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
 	raw := r.PathValue("job_id")
 	id, err := uuid.Parse(raw)
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid_job_id", "job_id must be a valid UUID")
+		jsonError(w, http.StatusBadRequest, "job_id must be a valid UUID")
 		return uuid.UUID{}, false
 	}
 	return id, true
 }
 
-func jsonOK(w http.ResponseWriter, status int, v any) {
+func jsonOK(w http.ResponseWriter, status int, message string, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
+	_ = json.NewEncoder(w).Encode(model.APIResponse{Success: true, Message: message, Data: data})
 }
 
-func jsonError(w http.ResponseWriter, status int, code, message string) {
+func jsonError(w http.ResponseWriter, status int, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]string{"error": code, "message": message})
+	_ = json.NewEncoder(w).Encode(model.APIResponse{Success: false, Message: message, Data: nil})
 }

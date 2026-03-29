@@ -39,13 +39,13 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/model.ListJobsResponse"
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/model.ErrorResponse"
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     }
                 }
@@ -77,31 +77,31 @@
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/model.MigrationJob"
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/model.ErrorResponse"
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/model.ErrorResponse"
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     },
                     "422": {
                         "description": "Unprocessable Entity",
                         "schema": {
-                            "$ref": "#/definitions/model.ErrorResponse"
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/model.ErrorResponse"
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     }
                 }
@@ -130,19 +130,19 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/model.MigrationJob"
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/model.ErrorResponse"
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/model.ErrorResponse"
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     }
                 }
@@ -171,19 +171,19 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/model.JobErrorsResponse"
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/model.ErrorResponse"
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/model.ErrorResponse"
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     }
                 }
@@ -212,25 +212,25 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/model.StatusResponse"
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/model.ErrorResponse"
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/model.ErrorResponse"
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/model.ErrorResponse"
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     }
                 }
@@ -259,25 +259,25 @@
                     "202": {
                         "description": "Accepted",
                         "schema": {
-                            "$ref": "#/definitions/model.StatusResponse"
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/model.ErrorResponse"
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/model.ErrorResponse"
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/model.ErrorResponse"
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     }
                 }
@@ -306,31 +306,31 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/model.StatusResponse"
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/model.ErrorResponse"
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/model.ErrorResponse"
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/model.ErrorResponse"
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/model.ErrorResponse"
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     }
                 }
@@ -359,26 +359,25 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/model.ErrorResponse"
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/model.ErrorResponse"
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/model.ErrorResponse"
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     }
                 }
@@ -398,7 +397,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/model.ListTablesResponse"
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     }
                 }
@@ -418,7 +417,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/model.HealthResponse"
+                            "$ref": "#/definitions/model.APIResponse"
                         }
                     }
                 }
@@ -426,6 +425,20 @@
         }
     },
     "definitions": {
+        "model.APIResponse": {
+            "type": "object",
+            "properties": {
+                "data": {},
+                "message": {
+                    "type": "string",
+                    "example": "job created"
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
         "model.CreateJobRequest": {
             "type": "object",
             "properties": {
@@ -448,172 +461,6 @@
                 "target_table": {
                     "type": "string",
                     "example": "pasien"
-                }
-            }
-        },
-        "model.ErrorResponse": {
-            "type": "object",
-            "properties": {
-                "error": {
-                    "type": "string",
-                    "example": "invalid_request"
-                },
-                "message": {
-                    "type": "string",
-                    "example": "source_table and target_table are required"
-                }
-            }
-        },
-        "model.HealthResponse": {
-            "type": "object",
-            "properties": {
-                "status": {
-                    "type": "string",
-                    "example": "ok"
-                },
-                "time": {
-                    "type": "string"
-                }
-            }
-        },
-        "model.JobErrorsResponse": {
-            "type": "object",
-            "properties": {
-                "errors": {
-                    "type": "array",
-                    "items": {}
-                },
-                "job_id": {
-                    "type": "string"
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "model.JobStatus": {
-            "type": "string",
-            "enum": [
-                "pending",
-                "running",
-                "paused",
-                "completed",
-                "failed",
-                "rolled_back"
-            ],
-            "x-enum-varnames": [
-                "JobStatusPending",
-                "JobStatusRunning",
-                "JobStatusPaused",
-                "JobStatusCompleted",
-                "JobStatusFailed",
-                "JobStatusRolledBack"
-            ]
-        },
-        "model.ListJobsResponse": {
-            "type": "object",
-            "properties": {
-                "jobs": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/model.MigrationJob"
-                    }
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "model.ListTablesResponse": {
-            "type": "object",
-            "properties": {
-                "supported": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
-        "model.MigrationJob": {
-            "type": "object",
-            "properties": {
-                "batch_delay_ms": {
-                    "type": "integer"
-                },
-                "batch_size": {
-                    "type": "integer"
-                },
-                "completed_at": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "dry_run": {
-                    "type": "boolean"
-                },
-                "error_log": {
-                    "description": "JSONB stored as raw bytes",
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "failed": {
-                    "type": "integer"
-                },
-                "first_processed_id": {
-                    "type": "integer"
-                },
-                "job_id": {
-                    "type": "string"
-                },
-                "last_processed_id": {
-                    "type": "integer"
-                },
-                "processed": {
-                    "type": "integer"
-                },
-                "rolled_back_at": {
-                    "type": "string"
-                },
-                "skipped": {
-                    "type": "integer"
-                },
-                "source_table": {
-                    "type": "string"
-                },
-                "started_at": {
-                    "type": "string"
-                },
-                "status": {
-                    "$ref": "#/definitions/model.JobStatus"
-                },
-                "success": {
-                    "type": "integer"
-                },
-                "target_table": {
-                    "type": "string"
-                },
-                "total_records": {
-                    "type": "integer"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "model.StatusResponse": {
-            "type": "object",
-            "properties": {
-                "job_id": {
-                    "type": "string",
-                    "example": "550e8400-e29b-41d4-a716-446655440000"
-                },
-                "status": {
-                    "type": "string",
-                    "example": "starting"
                 }
             }
         }

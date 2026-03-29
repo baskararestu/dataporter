@@ -53,38 +53,12 @@ type CreateJobRequest struct {
 	DryRun       bool   `json:"dry_run"       example:"false"`
 }
 
-// ErrorResponse is the standard error envelope returned on failures.
-type ErrorResponse struct {
-	Error   string `json:"error"   example:"invalid_request"`
-	Message string `json:"message" example:"source_table and target_table are required"`
-}
-
-// StatusResponse is a generic status message response.
-type StatusResponse struct {
-	JobID  string `json:"job_id"  example:"550e8400-e29b-41d4-a716-446655440000"`
-	Status string `json:"status"  example:"starting"`
-}
-
-// ListJobsResponse wraps the jobs list with a total count.
-type ListJobsResponse struct {
-	Jobs  []MigrationJob `json:"jobs"`
-	Total int            `json:"total"`
-}
-
-// ListTablesResponse lists supported source→target table pairs.
-type ListTablesResponse struct {
-	Supported []string `json:"supported"`
-}
-
-// HealthResponse is returned by the /healthz endpoint.
-type HealthResponse struct {
-	Status string    `json:"status" example:"ok"`
-	Time   time.Time `json:"time"`
-}
-
-// JobErrorsResponse wraps the error log for a job.
-type JobErrorsResponse struct {
-	JobID  string `json:"job_id"`
-	Errors []any  `json:"errors"`
-	Total  int    `json:"total"`
+// APIResponse is the standard response envelope for all API endpoints.
+// Success indicates whether the request succeeded.
+// Message provides a human-readable summary of the outcome.
+// Data holds the payload; null on error responses.
+type APIResponse struct {
+	Success bool   `json:"success"          example:"true"`
+	Message string `json:"message"          example:"job created"`
+	Data    any    `json:"data"`
 }
