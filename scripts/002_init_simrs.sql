@@ -63,29 +63,16 @@ CREATE TABLE IF NOT EXISTS migration.migration_jobs (
     updated_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
--- Deduplication: prevent concurrent or duplicate migration for same source+target.
--- 'completed' is included so a finished job blocks a new one (use rollback first to re-run).
+-- Deduplication: prevent concurrent migration for same source+target.
+-- Only blocks pending/running. Completed jobs do NOT block new ones,
+-- so new data can be migrated incrementally.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_migration_jobs_active_unique
     ON migration.migration_jobs (source_table, target_table)
-    WHERE status IN ('pending', 'running', 'completed');
+    WHERE status IN ('pending', 'running');
 
 CREATE INDEX IF NOT EXISTS idx_migration_jobs_status ON migration.migration_jobs (status);
 CREATE INDEX IF NOT EXISTS idx_migration_jobs_source ON migration.migration_jobs (source_table);
 
--- Mapping table: persistent ID relationship (audit trail)
-CREATE TABLE IF NOT EXISTS migration.emr_simrs_id_map (
-    source_id    BIGINT      NOT NULL,  -- id_pasien from EMR
-    target_uuid  UUID        NOT NULL,  -- pasien_uuid in SIMRS
-    source_table VARCHAR(50) NOT NULL,  -- 'pasien'
-    job_id       UUID        NOT NULL REFERENCES migration.migration_jobs(job_id),
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    PRIMARY KEY (source_table, source_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_id_map_target ON migration.emr_simrs_id_map (target_uuid);
-CREATE INDEX IF NOT EXISTS idx_id_map_job ON migration.emr_simrs_id_map (job_id);
-
 -- Verification
 SELECT 'SIMRS pasien table created (public schema)' AS info;
 SELECT 'migration_jobs table created (migration schema)' AS info;
-SELECT 'emr_simrs_id_map table created (migration schema)' AS info;
