@@ -17,13 +17,15 @@ import (
 	"github.com/baskararestu/dataporter/monitoring"
 	"github.com/baskararestu/dataporter/repository"
 	"github.com/baskararestu/dataporter/server"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog/log"
 )
 
+//go:embed scripts/001_init_emr.sql
+var emrDDL string
+
 //go:embed scripts/002_init_simrs.sql
-var schemaDDL string
+var simrsDDL string
 
 // @title           DataPorter API
 // @version         1.0
@@ -47,15 +49,17 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
+	// Bootstrap: create databases if missing, apply schemas, seed EMR data.
+	// Fully idempotent — safe on every startup.
+	if err := database.Bootstrap(ctx, cfg, emrDDL, simrsDDL); err != nil {
+		log.Fatal().Err(err).Msg("database bootstrap failed")
+	}
+
 	db, err := database.Connect(ctx, cfg.Source.DSN(), cfg.Target.DSN())
 	if err != nil {
 		log.Fatal().Err(err).Msg("database connection failed")
 	}
 	defer db.Close(ctx)
-
-	if err := ensureSchema(ctx, db.Target); err != nil {
-		log.Fatal().Err(err).Msg("ensure migration schema")
-	}
 
 	jobRepo := repository.NewJobRepository(db.Target)
 	tracker := monitoring.NewTracker()
@@ -68,12 +72,4 @@ func main() {
 	if err := srv.Run(ctx, cfg.HTTPPort); err != nil {
 		log.Error().Err(err).Msg("server shutdown error")
 	}
-}
-
-func ensureSchema(ctx context.Context, pool *pgxpool.Pool) error {
-	if _, err := pool.Exec(ctx, schemaDDL); err != nil {
-		return fmt.Errorf("ensureSchema: %w", err)
-	}
-	log.Info().Msg("migration schema ready")
-	return nil
 }
